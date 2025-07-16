@@ -25,30 +25,73 @@ if identifyexecutor and identifyexecutor() == "hhhh" then
 	LocalPlayer:Kick("Unfortunately, your executor is not supported to use this script. Find a new executor. Sorry for inconvenience.")
 	return
 end
-	-- Webhook function
 local function sendWebhook(data)
-	local body = {
-		content = data.content,
-		embeds = data.embeds
-	}
+    -- Validate input data
+    if not data or (not data.content and not data.embeds) then
+        warn("Webhook data is empty or invalid")
+        return false
+    end
 
-	local json = HttpService:JSONEncode(body)
+    -- Construct body with default values
+    local body = {
+        content = data.content or nil,
+        embeds = data.embeds or nil,
+        username = "Grow A Garden Notifier",
+        avatar_url = "https://i.imgur.com/xxxxxxx.png" -- Optional: add an avatar URL
+    }
 
-	local function sendRequest(url, data)
-		if syn and syn.request then
-			return syn.request({Url = url, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = data})
-		elseif http_request then
-			return http_request({Url = url, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = data})
-		elseif request then
-			return request({Url = url, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = data})
-		elseif fluxus and fluxus.request then
-			return fluxus.request({Url = url, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = data})
-		else
-			return nil
-		end
-	end
+    -- Encode to JSON with error handling
+    local json, encodeError
+    for _ = 1, 3 do -- Try up to 3 times
+        json, encodeError = pcall(HttpService.JSONEncode, HttpService, body)
+        if json then break end
+        task.wait(1)
+    end
 
-	sendRequest(Webhook1, json)
+    if not json then
+        warn("Failed to encode webhook data:", encodeError)
+        return false
+    end
+
+    -- Try different request methods with better error handling
+    local requestFunctions = {
+        syn and syn.request,
+        http_request,
+        request,
+        fluxus and fluxus.request,
+        http and http.request,
+        game.HttpService and game.HttpService.RequestAsync
+    }
+
+    local lastError = nil
+    for _, reqFunc in ipairs(requestFunctions) do
+        if type(reqFunc) == "function" then
+            local success, response = pcall(function()
+                return reqFunc({
+                    Url = Webhook1,
+                    Method = "POST",
+                    Headers = {
+                        ["Content-Type"] = "application/json",
+                        ["User-Agent"] = "Roblox"
+                    },
+                    Body = json
+                })
+            end)
+
+            if success and response then
+                if response.StatusCode and response.StatusCode >= 200 and response.StatusCode < 300 then
+                    return true
+                else
+                    lastError = "HTTP "..tostring(response.StatusCode or "no status")..": "..tostring(response.Body or "no body")
+                end
+            else
+                lastError = response or "Unknown error"
+            end
+        end
+    end
+
+    warn("All webhook request methods failed. Last error:", lastError)
+    return false
 end
 
 -- Loading GUI
