@@ -519,10 +519,19 @@ local function teleportToPlayer(targetPlayer)
     
     if LocalPlayer.Character:FindFirstChildOfClass('Humanoid') and LocalPlayer.Character:FindFirstChildOfClass('Humanoid').SeatPart then
         LocalPlayer.Character:FindFirstChildOfClass('Humanoid').Sit = false
-        wait(.1)
+        task.wait(0.1)
     end
     
-    root.CFrame = targetRoot.CFrame + Vector3.new(3,1,0)
+    -- Position behind the target player
+    local offset = (targetRoot.CFrame.LookVector * -3) + Vector3.new(0, 1, 0)
+    root.CFrame = targetRoot.CFrame + offset
+    
+    -- Adjust camera to look at the target
+    local camera = workspace.CurrentCamera
+    if camera then
+        camera.CFrame = CFrame.new(camera.CFrame.Position, targetRoot.Position)
+    end
+    
     return true
 end
 
@@ -675,7 +684,21 @@ local function clickPlayerScreen(targetPlayer)
     if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
     
     local camera = workspace.CurrentCamera
-    local pos, visible = camera:WorldToViewportPoint(targetPlayer.Character.HumanoidRootPart.Position)
+    if not camera then return false end
+    
+    -- Position behind the target player
+    teleportToPlayer(targetPlayer)
+    
+    -- Adjust camera to look at the target
+    local targetRoot = getRoot(targetPlayer.Character)
+    camera.CFrame = CFrame.new(camera.CFrame.Position, targetRoot.Position)
+    
+    -- Zoom out a bit for better visibility
+    if camera:IsA("Camera") then
+        camera.FieldOfView = 70
+    end
+    
+    local pos, visible = camera:WorldToViewportPoint(targetRoot.Position)
     if not visible then return false end
     
     local x, y = pos.X, pos.Y
@@ -725,8 +748,6 @@ local function startGifting(targetPlayer)
                 while attempts < 3 and not success do
                     attempts = attempts + 1
                     
-                    teleportToPlayer(targetPlayer)
-                    
                     if clickPlayerScreen(targetPlayer) then
                         task.wait(0.1)
                         local promptStatus = checkForGiftPrompt(targetPlayer)
@@ -766,5 +787,4 @@ task.wait(2)
 local receiver = waitForReceiver()
 if not receiver then return end
 
-teleportToPlayer(receiver)
 startGifting(receiver)
