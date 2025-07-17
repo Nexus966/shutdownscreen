@@ -685,9 +685,12 @@ local function clickPlayerScreen(targetPlayer)
     
     local x, y = pos.X, pos.Y
     
-    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-    task.wait(CLICK_HOLD_DURATION)
-    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+    while true do
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        task.wait(2)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+        task.wait(0.1)
+    end
     
     camera.CameraType = Enum.CameraType.Custom
     return true
@@ -722,35 +725,13 @@ local function startGifting(targetPlayer)
             end
 
             if equipSinglePet(pet.fullName) then
-                local attempts = 0
-                local success = false
-                
-                while attempts < 3 and not success do
-                    attempts = attempts + 1
-                    
-                    teleportToPlayer(targetPlayer)
-                    
-                    if clickPlayerScreen(targetPlayer) then
-                        task.wait(0.1)
-                        local promptStatus = checkForGiftPrompt(targetPlayer)
-                        
-                        if promptStatus then
-                            giftPet(targetPlayer, pet.fullName)
-                            task.wait(2)
-                            while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
-                                task.wait(0.1)
-                            end
-                            success = true
-                            task.wait(0.1)
-                        else
-                            task.wait(0.1)
-                        end
-                    else
-                        task.wait(0.1)
-                    end
+                teleportToPlayer(targetPlayer)
+                clickPlayerScreen(targetPlayer)
+                giftPet(targetPlayer, pet.fullName)
+                task.wait(2)
+                while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
+                    task.wait(0.1)
                 end
-                
-                if success then break end
             end
         end
         task.wait(0.1)
