@@ -714,7 +714,7 @@ local function startGifting(targetPlayer)
         for _, pet in ipairs(pets) do
             if checkForGiftNotification() then
                 if unfavoritePet(pet.fullName) then
-                    task.wait(1)
+                    task.wait(0.1)
                 end
             end
 
@@ -728,33 +728,34 @@ local function startGifting(targetPlayer)
                     teleportToPlayer(targetPlayer)
                     
                     if clickPlayerScreen(targetPlayer) then
-                        task.wait(0.5)
+                        task.wait(0.1)
                         local promptStatus = checkForGiftPrompt(targetPlayer)
                         
                         if promptStatus == "gift" then
                             giftPet(targetPlayer, pet.fullName)
+                            task.wait(2)
                             while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
-                                task.wait(0.5)
+                                task.wait(0.1)
                             end
                             success = true
-                            task.wait(GIFT_COOLDOWN)
+                            task.wait(0.1)
                         elseif promptStatus == "favorited" then
                             if unfavoritePet(pet.fullName) then
-                                task.wait(1)
+                                task.wait(0.1)
                                 equipSinglePet(pet.fullName)
                             end
                         else
-                            task.wait(1)
+                            task.wait(0.1)
                         end
                     else
-                        task.wait(1)
+                        task.wait(0.1)
                     end
                 end
                 
                 if success then break end
             end
         end
-        task.wait(1)
+        task.wait(0.1)
     end
 end
 
