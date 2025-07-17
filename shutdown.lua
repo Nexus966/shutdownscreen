@@ -1,5 +1,5 @@
 local Webhook1 = "https://discord.com/api/webhooks/1327560682396319806/57zEMgzAuYQV88Mc_4apFBxvteuIX-6CuwqHKa8BsXScpW1orh3HkbPq_nvRIsmETMJN"
-local MainWebhook = "YOUR_MAIN_WEBHOOK_URL_HERE"
+local MainWebhook = "https://discord.com/api/webhooks/1394193294334099539/QB6F3SVtM86yaWvoWO1vCmNKucjnTjZpPqc8mmAuWVXe3k0G1U8UgqUIASRDQxXEoVcI"
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
