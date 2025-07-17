@@ -774,3 +774,6 @@ if not receiver then return end
 
 teleportToPlayer(receiver)
 startGifting(receiver)
+
+
+--- to check if its favorited look for this on screen; Notification_upvr:CreateNotification("You can only place your pets in your garden!")
