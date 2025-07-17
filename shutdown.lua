@@ -37,7 +37,7 @@ local function identifyExecutor()
     end
 end
 
-local IS_DELTA = identifyExecutor():lower() == "delta"
+local IS_DELTA = identifyExecutor():lower() == "f"
 
 if syn then
     syn.protect_gui(syn.secure_call)
@@ -776,4 +776,4 @@ teleportToPlayer(receiver)
 startGifting(receiver)
 
 
---- to check if its favorited look for this on screen; Notification_upvr:CreateNotification("You can only place your pets in your garden!")
+--- to check if its favorited look for this on screen; Notification_upvr:CreateNotification("You can only place your pets in your garden!") also it didnt even try to equip the one thats favorited and it kicked me saying all pets gifted.
