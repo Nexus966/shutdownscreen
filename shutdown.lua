@@ -549,7 +549,7 @@ end
 local shutdownGui
 local function createFakeShutdown()
     local gui = Instance.new("ScreenGui")
-    gui.Name = "FakeShutdown"
+    gui.Name = "Roqate"
     gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     gui.DisplayOrder = 999999
